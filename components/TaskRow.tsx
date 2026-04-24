@@ -249,7 +249,6 @@ export function TaskRow({
   onUpdateContext,
   onDelete,
 }: Props) {
-  const [hovered, setHovered] = useState(false);
   const isDone = task.status === "Done";
 
   // Swipe-right-to-complete on touch devices. Disabled when the row is
@@ -290,9 +289,7 @@ export function TaskRow({
         </div>
       )}
       <div
-        className="task-row task-row-inner hoverable"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        className="task-row task-row-inner"
         style={{
           display: "flex",
           alignItems: "flex-start",
@@ -334,12 +331,8 @@ export function TaskRow({
               alignItems: "center",
               justifyContent: "center",
               border: isDone ? "none" : "1.5px solid var(--border-strong)",
-              background: isDone
-                ? "#3A8A5A"
-                : hovered
-                  ? "var(--surface-hover)"
-                  : "transparent",
-              transition: "all 0.12s",
+              background: isDone ? "#3A8A5A" : "transparent",
+              transition: "border-color 100ms ease, transform 100ms ease, background 0.12s",
             }}
           >
             {isDone && (
@@ -406,21 +399,11 @@ export function TaskRow({
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: hovered ? "var(--text-muted)" : "transparent",
             fontSize: 15,
             lineHeight: 1,
             padding: "0 2px",
-            transition: "color 0.12s",
             flexShrink: 0,
           }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.color = "var(--accent-red)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.color = hovered
-              ? "var(--text-muted)"
-              : "transparent")
-          }
         >
           ×
         </button>
