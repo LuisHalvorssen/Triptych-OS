@@ -303,7 +303,7 @@ export function TaskRow({
           opacity: isDone ? 0.5 : 1,
           transform: dx ? `translateX(${dx}px)` : undefined,
           transition: swipe.state.active ? "none" : "transform 0.18s ease-out, opacity 0.2s",
-          background: "var(--bg)",
+          background: "transparent",
           position: "relative",
         }}
       >
