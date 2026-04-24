@@ -158,12 +158,10 @@ function EditableTitle({
   muted: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  // Draft is seeded from `value` at the moment edit mode is entered
+  // (via the `key` remount), so we never need to sync it via an effect.
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!editing) setDraft(value);
-  }, [value, editing]);
 
   useEffect(() => {
     if (editing) {
@@ -176,7 +174,6 @@ function EditableTitle({
     const trimmed = draft.trim();
     setEditing(false);
     if (trimmed && trimmed !== value) onCommit(trimmed);
-    else setDraft(value);
   }
 
   if (editing) {
@@ -212,7 +209,10 @@ function EditableTitle({
 
   return (
     <button
-      onClick={() => setEditing(true)}
+      onClick={() => {
+        setDraft(value);
+        setEditing(true);
+      }}
       title="Click to edit"
       style={{
         flex: "1 1 180px",

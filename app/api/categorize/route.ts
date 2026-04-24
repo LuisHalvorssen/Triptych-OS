@@ -117,7 +117,6 @@ export async function POST(request: Request) {
     const response: CategorizeResponse = { context_tag: tag };
     return NextResponse.json(response);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("[categorize] Anthropic error:", err);
     const fallback: CategorizeResponse = { context_tag: DEFAULT_TAG };
     return NextResponse.json(fallback);

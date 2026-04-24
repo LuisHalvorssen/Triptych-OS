@@ -24,14 +24,10 @@ export function TaskInput({ currentUser, onCreate }: Props) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (loading) {
-      intervalRef.current = setInterval(() => {
-        setLoadingStep((s) => (s + 1) % LOADING_LABELS.length);
-      }, 650);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      setLoadingStep(0);
-    }
+    if (!loading) return;
+    intervalRef.current = setInterval(() => {
+      setLoadingStep((s) => (s + 1) % LOADING_LABELS.length);
+    }, 650);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -48,10 +44,10 @@ export function TaskInput({ currentUser, onCreate }: Props) {
         inputRef.current?.focus();
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error("Categorization failed:", err);
     } finally {
       setLoading(false);
+      setLoadingStep(0);
     }
   }
 

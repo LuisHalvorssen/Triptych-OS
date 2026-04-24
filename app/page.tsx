@@ -27,6 +27,9 @@ export default function HomePage() {
   const [hydrated, setHydrated] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  /* eslint-disable react-hooks/set-state-in-effect --
+   * Hydrating from document.cookie, which only exists after mount. Initial
+   * server render returns null so cascading renders here aren't a concern. */
   useEffect(() => {
     const t = readThemeCookie();
     setTheme(t);
@@ -34,6 +37,7 @@ export default function HomePage() {
     setCurrentUser(readUserCookie());
     setHydrated(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!hydrated) return;
@@ -113,7 +117,6 @@ export default function HomePage() {
         .single();
 
       if (error) {
-        // eslint-disable-next-line no-console
         console.error("[tasks] insert error:", error);
         return false;
       }
@@ -133,7 +136,6 @@ export default function HomePage() {
       setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
       const { error } = await supabase.from("tasks").update(patch).eq("id", id);
       if (error) {
-        // eslint-disable-next-line no-console
         console.error("[tasks] update error:", error);
       }
     },
@@ -165,7 +167,6 @@ export default function HomePage() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     const { error } = await supabase.from("tasks").delete().eq("id", id);
     if (error) {
-      // eslint-disable-next-line no-console
       console.error("[tasks] delete error:", error);
     }
   }, []);

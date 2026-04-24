@@ -6,7 +6,6 @@ const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
 if (!isSupabaseConfigured) {
-  // eslint-disable-next-line no-console
   console.warn(
     "[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY — running in stub mode."
   );
