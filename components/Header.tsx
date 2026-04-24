@@ -18,17 +18,17 @@ export function Header({
   onToggleTheme,
 }: Props) {
   return (
-    <div
+    <header
+      className="app-header"
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "18px 32px",
-        borderBottom: "1px solid var(--divider)",
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
         <span
+          className="app-header-brand"
           style={{
             fontSize: 10,
             fontWeight: 800,
@@ -40,6 +40,7 @@ export function Header({
           TRIPTYCH
         </span>
         <span
+          className="app-header-brand-os"
           style={{
             fontSize: 10,
             fontWeight: 700,
@@ -52,7 +53,10 @@ export function Header({
         </span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        className="app-header-avatars"
+        style={{ display: "flex", alignItems: "center", gap: 8 }}
+      >
         {TEAM.map((m) => {
           const active = currentUser === m;
           const color = OWNER_COLORS[m];
@@ -61,6 +65,8 @@ export function Header({
               key={m}
               onClick={() => onSwitchUser(m)}
               title={`View as ${m}`}
+              aria-label={`View as ${m}`}
+              className="app-header-avatar"
               style={{
                 width: 26,
                 height: 26,
@@ -73,6 +79,7 @@ export function Header({
                 cursor: "pointer",
                 fontFamily: "'Syne', sans-serif",
                 transition: "all 0.15s",
+                padding: 0,
               }}
             >
               {m[0]}
@@ -80,6 +87,7 @@ export function Header({
           );
         })}
         <span
+          className="app-header-current"
           style={{
             fontSize: 9,
             color: "var(--text-subtle)",
@@ -96,6 +104,7 @@ export function Header({
           onClick={onToggleTheme}
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           aria-label="Toggle theme"
+          className="app-header-toggle"
           style={{
             width: 26,
             height: 26,
@@ -110,20 +119,21 @@ export function Header({
             fontSize: 11,
             lineHeight: 1,
             transition: "all 0.15s",
+            padding: 0,
           }}
         >
           {theme === "dark" ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="4" />
               <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
             </svg>
           ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
             </svg>
           )}
         </button>
       </div>
-    </div>
+    </header>
   );
 }

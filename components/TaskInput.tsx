@@ -55,17 +55,20 @@ export function TaskInput({ currentUser, onCreate }: Props) {
 
   return (
     <div
+      className="task-input-outer"
       style={{
         padding: "44px 32px 32px",
         borderBottom: "1px solid var(--divider)",
         background: "var(--bg)",
       }}
     >
-      <div style={{ maxWidth: 740, margin: "0 auto" }}>
+      <div className="container-responsive" style={{ padding: 0 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
           <select
+            className="task-input-select"
             value={owner}
             onChange={(e) => setOwner(e.target.value as TeamMember)}
+            aria-label="Task owner"
             style={{
               background: "var(--surface)",
               border: "1px solid var(--border)",
@@ -82,6 +85,7 @@ export function TaskInput({ currentUser, onCreate }: Props) {
               appearance: "none",
               WebkitAppearance: "none",
               minWidth: 72,
+              minHeight: 44,
             }}
           >
             {TEAM.map((m) => (
@@ -94,6 +98,7 @@ export function TaskInput({ currentUser, onCreate }: Props) {
           <div style={{ flex: 1, position: "relative" }}>
             <input
               ref={inputRef}
+              className="task-input-field"
               value={loading ? "" : taskInput}
               onChange={(e) => setTaskInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
@@ -101,6 +106,9 @@ export function TaskInput({ currentUser, onCreate }: Props) {
                 loading ? LOADING_LABELS[loadingStep] : "what needs to get done?"
               }
               disabled={loading}
+              autoCapitalize="sentences"
+              autoCorrect="on"
+              enterKeyHint="send"
               style={{
                 width: "100%",
                 background: "var(--surface)",
@@ -114,6 +122,7 @@ export function TaskInput({ currentUser, onCreate }: Props) {
                 boxSizing: "border-box",
                 transition: "border-color 0.15s",
                 letterSpacing: "-0.01em",
+                minHeight: 44,
               }}
               onFocus={(e) =>
                 (e.currentTarget.style.borderColor = "var(--accent-blue)")
@@ -150,6 +159,8 @@ export function TaskInput({ currentUser, onCreate }: Props) {
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
+            aria-label="Add task"
+            className="task-input-submit"
             style={{
               background: canSubmit ? "var(--accent-blue)" : "var(--surface)",
               border: `1px solid ${canSubmit ? "var(--accent-blue)" : "var(--border)"}`,
@@ -163,13 +174,25 @@ export function TaskInput({ currentUser, onCreate }: Props) {
               letterSpacing: "0.1em",
               flexShrink: 0,
               transition: "all 0.15s",
+              minHeight: 44,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            ADD
+            <span className="task-input-submit-label">ADD</span>
+            <span
+              className="task-input-submit-icon"
+              aria-hidden="true"
+              style={{ fontSize: 20, lineHeight: 1 }}
+            >
+              ↵
+            </span>
           </button>
         </div>
 
         <div
+          className="task-input-helper"
           style={{
             marginTop: 10,
             fontSize: 9.5,

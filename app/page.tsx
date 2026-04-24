@@ -222,13 +222,7 @@ export default function HomePage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg)",
-        color: "var(--text-primary)",
-      }}
-    >
+    <div className="app-shell">
       <Header
         currentUser={currentUser}
         onSwitchUser={handleSelectUser}

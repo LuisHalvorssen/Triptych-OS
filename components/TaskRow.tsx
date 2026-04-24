@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { OWNER_COLORS, TAGS, TEAM, tagStyle } from "@/lib/constants";
+import { useSwipe } from "@/lib/useSwipe";
 import type { ContextTag, Task, TeamMember } from "@/lib/types";
 
 interface Props {
@@ -180,6 +181,7 @@ function EditableTitle({
     return (
       <input
         ref={inputRef}
+        className="task-title-input"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
@@ -209,6 +211,7 @@ function EditableTitle({
 
   return (
     <button
+      className="task-title-btn"
       onClick={() => {
         setDraft(value);
         setEditing(true);
@@ -249,122 +252,179 @@ export function TaskRow({
   const [hovered, setHovered] = useState(false);
   const isDone = task.status === "Done";
 
+  // Swipe-right-to-complete on touch devices. Disabled when the row is
+  // already done (so you can't double-fire the action). Caps the visual
+  // translate at 120px so the row can't fly off-screen.
+  const swipe = useSwipe({
+    onCompleteRight: isDone ? undefined : () => onToggleDone(task.id, true),
+    threshold: 80,
+  });
+  const dx = isDone ? 0 : Math.max(0, Math.min(swipe.state.dx, 120));
+  const showSwipeBg = dx > 0;
+
   return (
     <div
-      className="task-row"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="task-row-swipe"
+      data-swipe-active={showSwipeBg ? "true" : "false"}
+      {...swipe.handlers}
       style={{
-        display: "flex",
-        alignItems: "flex-start",
-        flexWrap: "wrap",
-        columnGap: 10,
-        rowGap: 6,
-        padding: "11px 0",
         borderBottom: "1px solid var(--divider)",
-        opacity: isDone ? 0.5 : 1,
-        transition: "opacity 0.2s",
       }}
     >
-      <button
-        onClick={() => onToggleDone(task.id, !isDone)}
-        aria-label={isDone ? "Mark as active" : "Mark as done"}
-        style={{
-          width: 17,
-          height: 17,
-          marginTop: 3,
-          borderRadius: "50%",
-          flexShrink: 0,
-          border: isDone ? "none" : "1.5px solid var(--border-strong)",
-          background: isDone
-            ? "#3A8A5A"
-            : hovered
-              ? "var(--surface-hover)"
-              : "transparent",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 0,
-          transition: "all 0.12s",
-        }}
-      >
-        {isDone && (
-          <span style={{ color: "#fff", fontSize: 9, lineHeight: 1 }}>✓</span>
-        )}
-      </button>
-
-      <div style={{ marginTop: 1, flexShrink: 0 }}>
-        <OwnerDotSelect
-          owner={task.owner}
-          onChange={(next) => onUpdateOwner(task.id, next)}
-          disabled={isDone}
-        />
-      </div>
-
-      <EditableTitle
-        value={task.title}
-        onCommit={(next) => onUpdateTitle(task.id, next)}
-        muted={isDone}
-      />
-
-      <div
-        className="task-meta"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexShrink: 0,
-          marginTop: 2,
-        }}
-      >
-        <span
-          title={`Created ${new Date(task.created_at).toLocaleString()}`}
+      {showSwipeBg && (
+        <div
+          aria-hidden="true"
           style={{
-            fontSize: 9,
-            fontFamily: "'IBM Plex Mono', monospace",
-            color: "var(--text-subtle)",
-            letterSpacing: "0.08em",
-            whiteSpace: "nowrap",
-            opacity: 0.7,
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            paddingLeft: 16,
+            color: "#3A8A5A",
+            fontSize: 18,
+            fontWeight: 700,
+            pointerEvents: "none",
           }}
         >
-          {formatCreatedAt(task.created_at)}
-        </span>
-
-        <TagPillSelect
-          tag={task.context}
-          onChange={(next) => onUpdateContext(task.id, next)}
-          disabled={isDone}
-        />
-      </div>
-
-      <button
-        className="task-delete"
-        onClick={() => onDelete(task.id)}
-        aria-label="Delete task"
+          ✓
+        </div>
+      )}
+      <div
+        className="task-row task-row-inner hoverable"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: hovered ? "var(--text-muted)" : "transparent",
-          fontSize: 15,
-          lineHeight: 1,
-          padding: "0 2px",
-          transition: "color 0.12s",
-          flexShrink: 0,
+          display: "flex",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          columnGap: 10,
+          rowGap: 6,
+          padding: "11px 0",
+          opacity: isDone ? 0.5 : 1,
+          transform: dx ? `translateX(${dx}px)` : undefined,
+          transition: swipe.state.active ? "none" : "transform 0.18s ease-out, opacity 0.2s",
+          background: "var(--bg)",
+          position: "relative",
         }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.color = "var(--accent-red)")
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.color = hovered
-            ? "var(--text-muted)"
-            : "transparent")
-        }
       >
-        ×
-      </button>
+        <button
+          onClick={() => onToggleDone(task.id, !isDone)}
+          aria-label={isDone ? "Mark as active" : "Mark as done"}
+          className="task-checkbox"
+          style={{
+            flexShrink: 0,
+            marginTop: -2,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span
+            aria-hidden="true"
+            className="task-checkbox-visual"
+            style={{
+              width: 17,
+              height: 17,
+              borderRadius: "50%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: isDone ? "none" : "1.5px solid var(--border-strong)",
+              background: isDone
+                ? "#3A8A5A"
+                : hovered
+                  ? "var(--surface-hover)"
+                  : "transparent",
+              transition: "all 0.12s",
+            }}
+          >
+            {isDone && (
+              <span style={{ color: "#fff", fontSize: 9, lineHeight: 1 }}>
+                ✓
+              </span>
+            )}
+          </span>
+        </button>
+
+        <div className="task-owner-wrap" style={{ marginTop: 1, flexShrink: 0 }}>
+          <OwnerDotSelect
+            owner={task.owner}
+            onChange={(next) => onUpdateOwner(task.id, next)}
+            disabled={isDone}
+          />
+        </div>
+
+        <EditableTitle
+          value={task.title}
+          onCommit={(next) => onUpdateTitle(task.id, next)}
+          muted={isDone}
+        />
+
+        <div
+          className="task-meta"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexShrink: 0,
+            marginTop: 2,
+          }}
+        >
+          <span
+            className="task-date"
+            title={`Created ${new Date(task.created_at).toLocaleString()}`}
+            style={{
+              fontSize: 9,
+              fontFamily: "'IBM Plex Mono', monospace",
+              color: "var(--text-subtle)",
+              letterSpacing: "0.08em",
+              whiteSpace: "nowrap",
+              opacity: 0.7,
+            }}
+          >
+            {formatCreatedAt(task.created_at)}
+          </span>
+
+          <span className="task-tag">
+            <TagPillSelect
+              tag={task.context}
+              onChange={(next) => onUpdateContext(task.id, next)}
+              disabled={isDone}
+            />
+          </span>
+        </div>
+
+        <button
+          className="task-delete tap-target"
+          onClick={() => onDelete(task.id)}
+          aria-label="Delete task"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: hovered ? "var(--text-muted)" : "transparent",
+            fontSize: 15,
+            lineHeight: 1,
+            padding: "0 2px",
+            transition: "color 0.12s",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.color = "var(--accent-red)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = hovered
+              ? "var(--text-muted)"
+              : "transparent")
+          }
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }

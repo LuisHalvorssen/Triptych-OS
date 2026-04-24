@@ -36,11 +36,12 @@ function FilterPill({
   return (
     <button
       onClick={onClick}
+      className="tap-target"
       style={{
         background: active ? "var(--surface-hover)" : "transparent",
         border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
         color: active ? "var(--text-primary)" : "var(--text-muted)",
-        padding: "3px 11px",
+        padding: "6px 12px",
         borderRadius: 2,
         cursor: "pointer",
         fontSize: 10,
@@ -59,9 +60,11 @@ function FilterPill({
 function ContextFilterSelect({
   value,
   onChange,
+  className,
 }: {
   value: ContextFilter;
   onChange: (next: ContextFilter) => void;
+  className?: string;
 }) {
   const isAll = value === "all";
   const style = isAll
@@ -71,11 +74,13 @@ function ContextFilterSelect({
   return (
     <label
       title="Filter by context tag"
+      className={className}
       style={{
         position: "relative",
         display: "inline-flex",
         alignItems: "center",
         cursor: "pointer",
+        minHeight: 32,
       }}
     >
       <span
@@ -88,7 +93,7 @@ function ContextFilterSelect({
           color: style.color,
           background: isAll ? "transparent" : (style as { bg: string }).bg,
           border: `1px solid ${isAll ? "transparent" : "var(--border-strong)"}`,
-          padding: "3px 11px",
+          padding: "5px 11px",
           borderRadius: 2,
           whiteSpace: "nowrap",
           pointerEvents: "none",
@@ -160,13 +165,15 @@ export function TaskList({
   );
 
   return (
-    <div style={{ maxWidth: 740, margin: "0 auto", padding: "0 32px 64px" }}>
+    <div className="container-responsive" style={{ paddingBottom: 64 }}>
+      {/* Row 1 (desktop + mobile): counts (+ ctx on desktop) ··· All/Mine */}
       <div
+        className="filter-row-1"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "18px 0 10px",
+          padding: "14px 0 8px",
           gap: 12,
           flexWrap: "wrap",
         }}
@@ -174,7 +181,7 @@ export function TaskList({
         <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
           <span
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: "var(--text-muted)",
               letterSpacing: "0.1em",
               fontFamily: "'Syne', sans-serif",
@@ -189,10 +196,14 @@ export function TaskList({
 
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <ContextFilterSelect
+            className="filter-ctx-desktop"
             value={contextFilter}
             onChange={setContextFilter}
           />
-          <div style={{ width: 1, height: 14, background: "var(--border)" }} />
+          <div
+            className="filter-ctx-divider"
+            style={{ width: 1, height: 14, background: "var(--border)" }}
+          />
           <FilterPill
             active={ownerFilter === "all"}
             onClick={() => setOwnerFilter("all")}
@@ -208,46 +219,60 @@ export function TaskList({
         </div>
       </div>
 
+      {/* Row 2: tabs (+ ctx on mobile) */}
       <div
+        className="filter-tabs-row"
         style={{
           display: "flex",
-          gap: 0,
           borderBottom: "1px solid var(--divider)",
           marginBottom: 2,
+          justifyContent: "space-between",
+          alignItems: "flex-end",
         }}
       >
-        {TABS.map((t) => {
-          const active = tab === t.id;
-          const count =
-            t.id === "active" ? activeTasks.length : closedTasks.length;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                background: "none",
-                border: "none",
-                color: active ? "var(--text-primary)" : "var(--text-muted)",
-                padding: "8px 14px 9px",
-                fontSize: 9.5,
-                fontFamily: "'Syne', sans-serif",
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                cursor: "pointer",
-                borderBottom: `1.5px solid ${active ? "var(--accent-blue)" : "transparent"}`,
-                marginBottom: -1,
-                transition: "all 0.12s",
-                display: "inline-flex",
-                alignItems: "baseline",
-                gap: 6,
-              }}
-            >
-              {t.label}
-              <span style={{ fontSize: 8.5, opacity: 0.6 }}>{count}</span>
-            </button>
-          );
-        })}
+        <div style={{ display: "flex" }}>
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            const count =
+              t.id === "active" ? activeTasks.length : closedTasks.length;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className="tap-target"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: active ? "var(--text-primary)" : "var(--text-muted)",
+                  padding: "10px 14px 9px",
+                  fontSize: 10,
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                  borderBottom: `1.5px solid ${active ? "var(--accent-blue)" : "transparent"}`,
+                  marginBottom: -1,
+                  transition: "all 0.12s",
+                  display: "inline-flex",
+                  alignItems: "baseline",
+                  gap: 6,
+                }}
+              >
+                {t.label}
+                <span style={{ fontSize: 9, opacity: 0.6 }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: "0 0 4px" }}>
+          <ContextFilterSelect
+            className="filter-ctx-mobile"
+            value={contextFilter}
+            onChange={setContextFilter}
+          />
+        </div>
       </div>
 
       <div style={{ minHeight: 120 }}>

@@ -19,6 +19,8 @@ html[data-theme="dark"] {
   --accent-gold: #CC9933;
   --accent-red: #CC3333;
   --placeholder: #3A3A62;
+
+  --swipe-complete: rgba(58, 138, 90, 0.35);
 }
 
 html[data-theme="light"] {
@@ -37,6 +39,8 @@ html[data-theme="light"] {
   --accent-gold: #B08020;
   --accent-red: #CC3333;
   --placeholder: #A8A4B8;
+
+  --swipe-complete: rgba(58, 138, 90, 0.28);
 }
 
 * { box-sizing: border-box; }
@@ -48,6 +52,12 @@ html, body {
   margin: 0;
   padding: 0;
   transition: background-color 0.2s ease;
+  overflow-x: hidden;
+}
+
+/* Kill iOS tap highlight — we handle feedback ourselves. */
+button, a, label, input, select {
+  -webkit-tap-highlight-color: transparent;
 }
 
 input::placeholder { color: var(--placeholder); font-style: italic; }
@@ -66,12 +76,160 @@ select option { background: var(--surface); color: var(--text-primary); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Touch devices: always show delete (no hover), and ensure the wrapped meta
-   row aligns with the title (indented past checkbox + owner). */
-@media (hover: none), (max-width: 640px) {
-  .task-row .task-delete { color: var(--text-muted) !important; opacity: 0.55; }
+/* =========================================================================
+   Responsive container — mobile full-bleed, tablet 680, desktop 900.
+   ========================================================================= */
+.container-responsive {
+  width: 100%;
+  padding: 0 16px;
+  margin: 0 auto;
+}
+@media (min-width: 640px) {
+  .container-responsive { max-width: 680px; padding: 0 32px; }
+}
+@media (min-width: 1024px) {
+  .container-responsive { max-width: 900px; }
 }
 
-@media (max-width: 640px) {
-  .task-row .task-meta { margin-left: 49px; }
+/* Safe-area aware app shell. */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text-primary);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* =========================================================================
+   Header — sticky, safe-area padded.
+   ========================================================================= */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider);
+  padding: 18px 32px;
+  padding-top: calc(18px + env(safe-area-inset-top));
+  padding-left: calc(32px + env(safe-area-inset-left));
+  padding-right: calc(32px + env(safe-area-inset-right));
+}
+@media (max-width: 639px) {
+  .app-header { padding: 10px 16px; }
+  .app-header .app-header-brand-os { display: none; }
+  .app-header .app-header-current { display: none; }
+  .app-header .app-header-avatars { gap: 6px; }
+  .app-header .app-header-avatar { width: 32px; height: 32px; font-size: 11px; }
+  .app-header .app-header-toggle { width: 32px; height: 32px; }
+}
+
+/* =========================================================================
+   Task input — hide helper text on mobile, stretch select + button.
+   ========================================================================= */
+/* Submit button: text label on desktop, arrow icon on mobile. */
+.task-input-submit-icon { display: none; }
+@media (max-width: 639px) {
+  .task-input-outer { padding: 20px 16px 16px !important; }
+  .task-input-helper { display: none !important; }
+  .task-input-select { min-width: 54px !important; padding: 10px 12px !important; font-size: 13px !important; }
+  .task-input-field { font-size: 16px !important; /* prevent iOS zoom */ padding: 13px 16px !important; }
+  .task-input-submit { padding: 13px 16px !important; min-width: 54px; }
+  .task-input-submit-label { display: none !important; }
+  .task-input-submit-icon { display: inline !important; }
+}
+
+/* =========================================================================
+   Filter bar — stacks into two rows on mobile.
+   Row 1: counts + All/Mine | Row 2: tabs + Context filter
+   ========================================================================= */
+@media (max-width: 639px) {
+  .filter-row-1 { flex-wrap: wrap; gap: 10px 8px !important; }
+  .filter-row-1 .filter-ctx-desktop { display: none !important; }
+  .filter-row-1 .filter-ctx-divider { display: none !important; }
+  .filter-tabs-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .filter-ctx-mobile { display: inline-flex !important; }
+}
+@media (min-width: 640px) {
+  .filter-ctx-mobile { display: none !important; }
+}
+
+/* =========================================================================
+   Task row — single-line desktop, two-line stacked on mobile.
+   ========================================================================= */
+.task-row {
+  min-height: 44px;
+}
+@media (max-width: 639px) {
+  .task-row {
+    min-height: 56px;
+    padding: 10px 0 !important;
+    column-gap: 10px !important;
+  }
+  .task-row .task-checkbox {
+    width: 44px !important;
+    height: 44px !important;
+    margin: -12px -6px -12px -12px !important; /* expand tap area, pull visual left */
+  }
+  .task-row .task-checkbox-visual {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  .task-row .task-owner-wrap { margin-top: 0 !important; }
+  .task-row .task-title-btn {
+    flex: 1 1 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 14px !important;
+  }
+  .task-row .task-title-input { font-size: 16px !important; /* prevent iOS zoom */ }
+  .task-row .task-meta {
+    margin-left: 36px;
+    order: 2;
+    width: 100%;
+    margin-top: 2px;
+  }
+  .task-row .task-meta .task-date { font-size: 11px !important; opacity: 0.8 !important; }
+  .task-row .task-meta .task-tag { font-size: 10px !important; }
+  .task-row .task-delete {
+    width: 44px;
+    height: 44px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+    margin: -12px -6px -12px 0; /* expand tap target without changing visual size */
+    font-size: 20px !important;
+    color: var(--text-muted) !important;
+    opacity: 0.55;
+  }
+}
+
+/* =========================================================================
+   Hover scoping — only pointer-capable devices get hover effects.
+   Touch devices get :active feedback (handled inline per-component).
+   ========================================================================= */
+@media (hover: hover) {
+  .hoverable:hover { background: var(--surface-hover); }
+}
+
+/* =========================================================================
+   Swipe-to-complete visual track. Consumer applies inline transform.
+   ========================================================================= */
+.task-row-swipe {
+  position: relative;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+.task-row-swipe[data-swipe-active="true"] {
+  background: var(--swipe-complete);
+}
+.task-row-swipe .task-row-inner {
+  transition: transform 0.18s ease-out;
+  will-change: transform;
+}
+
+/* Minimum tap target for anything that looks tappable. */
+@media (max-width: 639px) {
+  .tap-target { min-width: 44px; min-height: 44px; }
 }
