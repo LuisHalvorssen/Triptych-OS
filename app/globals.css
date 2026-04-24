@@ -20,6 +20,9 @@ html[data-theme="dark"] {
   --accent-red: #CC3333;
   --placeholder: #3A3A62;
 
+  --task-title: #E8E8E8;
+  --task-date: #777777;
+
   --swipe-complete: rgba(58, 138, 90, 0.35);
 }
 
@@ -39,6 +42,9 @@ html[data-theme="light"] {
   --accent-gold: #B08020;
   --accent-red: #CC3333;
   --placeholder: #A8A4B8;
+
+  --task-title: #1A1A2E;
+  --task-date: #999999;
 
   --swipe-complete: rgba(58, 138, 90, 0.28);
 }
@@ -191,17 +197,19 @@ select option { background: var(--surface); color: var(--text-primary); }
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    font-size: 14px !important;
+    font-size: 0.875rem !important; /* 14px floor on mobile */
   }
-  .task-row .task-title-input { font-size: 16px !important; /* prevent iOS zoom */ }
+  .task-row .task-title-input { font-size: 1rem !important; /* 16px prevents iOS zoom */ }
   .task-row .task-meta {
     margin-left: 36px;
     order: 2;
     width: 100%;
     margin-top: 2px;
   }
-  .task-row .task-meta .task-date { font-size: 11px !important; opacity: 0.8 !important; }
-  .task-row .task-meta .task-tag { font-size: 10px !important; }
+  .task-row .task-meta .task-date { font-size: 0.8125rem !important; /* 13px on stacked row */ }
+  .task-row .task-meta .task-tag-pill { font-size: 0.625rem !important; /* 10px floor */ }
+  .open-counter,
+  .open-counter > span:first-child { font-size: 1rem !important; /* 16px on mobile */ }
   .task-row .task-delete {
     width: 44px;
     height: 44px;

@@ -180,17 +180,27 @@ export function TaskList({
       >
         <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
           <span
+            className="open-counter"
             style={{
-              fontSize: 11,
+              fontSize: "1.125rem", // 18px desktop
               color: "var(--text-muted)",
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
               fontFamily: "'Syne', sans-serif",
+              display: "inline-flex",
+              alignItems: "baseline",
+              gap: 6,
             }}
           >
-            <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>
+            <span
+              style={{
+                color: "var(--text-primary)",
+                fontWeight: 600,
+                fontSize: "1.125rem",
+              }}
+            >
               {openCount}
-            </span>{" "}
-            OPEN
+            </span>
+            <span style={{ fontSize: "0.8125rem", fontWeight: 400 }}>OPEN</span>
           </span>
         </div>
 
@@ -245,10 +255,10 @@ export function TaskList({
                   border: "none",
                   color: active ? "var(--text-primary)" : "var(--text-muted)",
                   padding: "10px 14px 9px",
-                  fontSize: 10,
+                  fontSize: "0.8125rem", // 13px
                   fontFamily: "'Syne', sans-serif",
-                  fontWeight: 700,
-                  letterSpacing: "0.1em",
+                  fontWeight: 500,
+                  letterSpacing: "0.08em",
                   textTransform: "uppercase",
                   cursor: "pointer",
                   borderBottom: `1.5px solid ${active ? "var(--accent-blue)" : "transparent"}`,
@@ -260,7 +270,15 @@ export function TaskList({
                 }}
               >
                 {t.label}
-                <span style={{ fontSize: 9, opacity: 0.6 }}>{count}</span>
+                <span
+                  style={{
+                    fontSize: "0.6875rem",
+                    fontWeight: 400,
+                    opacity: 0.6,
+                  }}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}

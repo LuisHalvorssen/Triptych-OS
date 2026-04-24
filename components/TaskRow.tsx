@@ -109,10 +109,11 @@ function TagPillSelect({
       }}
     >
       <span
+        className="task-tag-pill"
         style={{
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: "0.1em",
+          fontSize: "0.6875rem", // 11px desktop
+          fontWeight: 500,
+          letterSpacing: "0.04em",
           textTransform: "uppercase",
           fontFamily: "'Syne', sans-serif",
           color,
@@ -196,8 +197,9 @@ function EditableTitle({
           flex: 1,
           minWidth: 0,
           fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: 12.5,
-          color: "var(--text-primary)",
+          fontSize: "0.9375rem", // 15px
+          fontWeight: 500,
+          color: "var(--task-title)",
           background: "var(--surface)",
           border: "1px solid var(--accent-blue)",
           borderRadius: 2,
@@ -226,8 +228,9 @@ function EditableTitle({
         textAlign: "left",
         cursor: "text",
         fontFamily: "'IBM Plex Mono', monospace",
-        fontSize: 12.5,
-        color: muted ? "var(--text-muted)" : "var(--text-primary)",
+        fontSize: "0.9375rem", // 15px
+        fontWeight: 500,
+        color: muted ? "var(--text-muted)" : "var(--task-title)",
         letterSpacing: "-0.01em",
         textDecoration: muted ? "line-through" : "none",
         lineHeight: 1.45,
@@ -371,12 +374,12 @@ export function TaskRow({
             className="task-date"
             title={`Created ${new Date(task.created_at).toLocaleString()}`}
             style={{
-              fontSize: 9,
+              fontSize: "0.75rem", // 12px desktop
+              fontWeight: 400,
               fontFamily: "'IBM Plex Mono', monospace",
-              color: "var(--text-subtle)",
+              color: "var(--task-date)",
               letterSpacing: "0.08em",
               whiteSpace: "nowrap",
-              opacity: 0.7,
             }}
           >
             {formatCreatedAt(task.created_at)}
