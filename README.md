@@ -3,6 +3,8 @@
 Internal task tracker for [Triptych Management](https://triptychmgmt.com) — a 4-person music/media company in NYC.
 Live at **[tasks.triptychmgmt.com](https://tasks.triptychmgmt.com)** (password-gated).
 
+> 🤖 **Starting a new Claude Code session on this repo?** Read [`docs/SESSION-CONTEXT.md`](docs/SESSION-CONTEXT.md) first — it has the full handoff (accounts, conventions, in-flight work, gotchas).
+
 ## Stack
 
 - **Next.js 16** (App Router) + TypeScript (strict) + Tailwind
