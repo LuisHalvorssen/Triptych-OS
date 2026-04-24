@@ -166,6 +166,7 @@ export function TaskList({
 
   return (
     <div className="container-responsive" style={{ paddingBottom: 64 }}>
+      <div className="task-list-card">
       {/* Row 1 (desktop + mobile): counts (+ ctx on desktop) ··· All/Mine */}
       <div
         className="filter-row-1"
@@ -234,7 +235,7 @@ export function TaskList({
         className="filter-tabs-row"
         style={{
           display: "flex",
-          borderBottom: "1px solid var(--divider)",
+          borderBottom: "1px solid var(--row-divider)",
           marginBottom: 2,
           justifyContent: "space-between",
           alignItems: "flex-end",
@@ -321,6 +322,7 @@ export function TaskList({
             />
           ))
         )}
+      </div>
       </div>
     </div>
   );

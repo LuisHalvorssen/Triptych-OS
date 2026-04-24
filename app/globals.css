@@ -23,6 +23,11 @@ html[data-theme="dark"] {
   --task-title: #E8E8E8;
   --task-date: #777777;
 
+  --card-bg: #111139;
+  --row-divider: rgba(255, 255, 255, 0.08);
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --card-shadow-mobile: 0 1px 2px rgba(0, 0, 0, 0.2);
+
   --swipe-complete: rgba(58, 138, 90, 0.35);
 }
 
@@ -45,6 +50,11 @@ html[data-theme="light"] {
 
   --task-title: #1A1A2E;
   --task-date: #999999;
+
+  --card-bg: #FFFFFF;
+  --row-divider: #EAEAEA;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --card-shadow-mobile: 0 1px 2px rgba(0, 0, 0, 0.04);
 
   --swipe-complete: rgba(58, 138, 90, 0.28);
 }
@@ -114,7 +124,7 @@ select option { background: var(--surface); color: var(--text-primary); }
   top: 0;
   z-index: 50;
   background: var(--bg);
-  border-bottom: 1px solid var(--divider);
+  border-bottom: 1px solid var(--row-divider);
   padding: 18px 32px;
   padding-top: calc(18px + env(safe-area-inset-top));
   padding-left: calc(32px + env(safe-area-inset-left));
@@ -160,6 +170,35 @@ select option { background: var(--surface); color: var(--text-primary); }
 }
 
 /* =========================================================================
+   Task list card — distinct elevated surface around the list.
+   Mobile: edge-to-edge (negate container 16px gutter), no radius, lighter shadow.
+   ========================================================================= */
+.task-list-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  padding: 4px 18px 12px;
+  margin-top: 8px;
+}
+@media (max-width: 639px) {
+  .task-list-card {
+    border-radius: 0;
+    box-shadow: var(--card-shadow-mobile);
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    margin-top: 0;
+  }
+}
+
+/* Last task row in the card has no divider. */
+.task-list-card .task-row-swipe:last-child {
+  border-bottom: none !important;
+}
+
+/* =========================================================================
    Task row — single-line desktop, two-line stacked on mobile.
    ========================================================================= */
 .task-row {
@@ -174,7 +213,7 @@ select option { background: var(--surface); color: var(--text-primary); }
 @media (max-width: 639px) {
   .task-row {
     min-height: 56px;
-    padding: 10px 0 !important;
+    padding: 12px 0 !important;
     column-gap: 10px !important;
   }
   .task-row .task-checkbox {

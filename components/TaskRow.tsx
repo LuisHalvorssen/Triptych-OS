@@ -270,7 +270,7 @@ export function TaskRow({
       data-swipe-active={showSwipeBg ? "true" : "false"}
       {...swipe.handlers}
       style={{
-        borderBottom: "1px solid var(--divider)",
+        borderBottom: "1px solid var(--row-divider)",
       }}
     >
       {showSwipeBg && (
@@ -299,7 +299,7 @@ export function TaskRow({
           flexWrap: "wrap",
           columnGap: 10,
           rowGap: 6,
-          padding: "11px 0",
+          padding: "14px 0",
           opacity: isDone ? 0.5 : 1,
           transform: dx ? `translateX(${dx}px)` : undefined,
           transition: swipe.state.active ? "none" : "transform 0.18s ease-out, opacity 0.2s",
