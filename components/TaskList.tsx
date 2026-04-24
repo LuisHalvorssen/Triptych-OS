@@ -1,0 +1,284 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { TAGS, tagStyle } from "@/lib/constants";
+import type { ContextTag, Task, TeamMember } from "@/lib/types";
+import { TaskRow } from "./TaskRow";
+
+type OwnerFilter = "all" | "mine";
+type ContextFilter = "all" | ContextTag;
+type Tab = "active" | "closed";
+
+interface Props {
+  tasks: Task[];
+  currentUser: TeamMember;
+  onToggleDone: (id: string, nextDone: boolean) => Promise<void>;
+  onUpdateTitle: (id: string, title: string) => Promise<void>;
+  onUpdateOwner: (id: string, owner: TeamMember) => Promise<void>;
+  onUpdateContext: (id: string, context: ContextTag) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "active", label: "Active" },
+  { id: "closed", label: "Closed" },
+];
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: active ? "var(--surface-hover)" : "transparent",
+        border: `1px solid ${active ? "var(--border-strong)" : "transparent"}`,
+        color: active ? "var(--text-primary)" : "var(--text-muted)",
+        padding: "3px 11px",
+        borderRadius: 2,
+        cursor: "pointer",
+        fontSize: 10,
+        fontFamily: "'Syne', sans-serif",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        transition: "all 0.12s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ContextFilterSelect({
+  value,
+  onChange,
+}: {
+  value: ContextFilter;
+  onChange: (next: ContextFilter) => void;
+}) {
+  const isAll = value === "all";
+  const style = isAll
+    ? { color: "var(--text-muted)", bg: "transparent" }
+    : tagStyle(value as ContextTag);
+
+  return (
+    <label
+      title="Filter by context tag"
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        cursor: "pointer",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 10,
+          fontFamily: "'Syne', sans-serif",
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: style.color,
+          background: isAll ? "transparent" : (style as { bg: string }).bg,
+          border: `1px solid ${isAll ? "transparent" : "var(--border-strong)"}`,
+          padding: "3px 11px",
+          borderRadius: 2,
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        {isAll ? "All Contexts" : value}
+        <span style={{ fontSize: 8, opacity: 0.7 }}>▾</span>
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as ContextFilter)}
+        style={{
+          position: "absolute",
+          inset: 0,
+          opacity: 0,
+          cursor: "pointer",
+          border: "none",
+          background: "transparent",
+        }}
+      >
+        <option value="all">All Contexts</option>
+        {TAGS.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function TaskList({
+  tasks,
+  currentUser,
+  onToggleDone,
+  onUpdateTitle,
+  onUpdateOwner,
+  onUpdateContext,
+  onDelete,
+}: Props) {
+  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
+  const [contextFilter, setContextFilter] = useState<ContextFilter>("all");
+  const [tab, setTab] = useState<Tab>("active");
+
+  const scoped = useMemo(() => {
+    return tasks.filter((t) => {
+      if (ownerFilter === "mine" && t.owner !== currentUser) return false;
+      if (contextFilter !== "all" && t.context !== contextFilter) return false;
+      return true;
+    });
+  }, [tasks, ownerFilter, contextFilter, currentUser]);
+
+  const activeTasks = useMemo(
+    () => scoped.filter((t) => t.status !== "Done"),
+    [scoped]
+  );
+  const closedTasks = useMemo(
+    () => scoped.filter((t) => t.status === "Done"),
+    [scoped]
+  );
+
+  const visible = tab === "active" ? activeTasks : closedTasks;
+  const openCount = useMemo(
+    () => tasks.filter((t) => t.status !== "Done").length,
+    [tasks]
+  );
+
+  return (
+    <div style={{ maxWidth: 740, margin: "0 auto", padding: "0 32px 64px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "18px 0 10px",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--text-muted)",
+              letterSpacing: "0.1em",
+              fontFamily: "'Syne', sans-serif",
+            }}
+          >
+            <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>
+              {openCount}
+            </span>{" "}
+            OPEN
+          </span>
+        </div>
+
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <ContextFilterSelect
+            value={contextFilter}
+            onChange={setContextFilter}
+          />
+          <div style={{ width: 1, height: 14, background: "var(--border)" }} />
+          <FilterPill
+            active={ownerFilter === "all"}
+            onClick={() => setOwnerFilter("all")}
+          >
+            All
+          </FilterPill>
+          <FilterPill
+            active={ownerFilter === "mine"}
+            onClick={() => setOwnerFilter("mine")}
+          >
+            Mine
+          </FilterPill>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 0,
+          borderBottom: "1px solid var(--divider)",
+          marginBottom: 2,
+        }}
+      >
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          const count =
+            t.id === "active" ? activeTasks.length : closedTasks.length;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                background: "none",
+                border: "none",
+                color: active ? "var(--text-primary)" : "var(--text-muted)",
+                padding: "8px 14px 9px",
+                fontSize: 9.5,
+                fontFamily: "'Syne', sans-serif",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+                borderBottom: `1.5px solid ${active ? "var(--accent-blue)" : "transparent"}`,
+                marginBottom: -1,
+                transition: "all 0.12s",
+                display: "inline-flex",
+                alignItems: "baseline",
+                gap: 6,
+              }}
+            >
+              {t.label}
+              <span style={{ fontSize: 8.5, opacity: 0.6 }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ minHeight: 120 }}>
+        {visible.length === 0 ? (
+          <div
+            style={{
+              padding: "52px 0",
+              textAlign: "center",
+              fontSize: 10,
+              color: "var(--text-subtle)",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              fontFamily: "'Syne', sans-serif",
+            }}
+          >
+            {tab === "active" ? "no active tasks" : "no closed tasks"}
+          </div>
+        ) : (
+          visible.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              onToggleDone={onToggleDone}
+              onUpdateTitle={onUpdateTitle}
+              onUpdateOwner={onUpdateOwner}
+              onUpdateContext={onUpdateContext}
+              onDelete={onDelete}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
