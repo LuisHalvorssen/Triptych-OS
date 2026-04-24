@@ -61,6 +61,11 @@ select option { background: var(--surface); color: var(--text-primary); }
   50%      { opacity: 1;    transform: scale(1);   }
 }
 
+@keyframes tp-toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Touch devices: always show delete (no hover), and ensure the wrapped meta
    row aligns with the title (indented past checkbox + owner). */
 @media (hover: none), (max-width: 640px) {
