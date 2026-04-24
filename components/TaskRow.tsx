@@ -215,7 +215,7 @@ function EditableTitle({
       onClick={() => setEditing(true)}
       title="Click to edit"
       style={{
-        flex: 1,
+        flex: "1 1 180px",
         minWidth: 0,
         background: "none",
         border: "none",
@@ -228,9 +228,9 @@ function EditableTitle({
         letterSpacing: "-0.01em",
         textDecoration: muted ? "line-through" : "none",
         lineHeight: 1.45,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
+        whiteSpace: "normal",
+        wordBreak: "break-word",
+        overflowWrap: "anywhere",
       }}
     >
       {value}
@@ -251,12 +251,15 @@ export function TaskRow({
 
   return (
     <div
+      className="task-row"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
-        alignItems: "center",
-        gap: 10,
+        alignItems: "flex-start",
+        flexWrap: "wrap",
+        columnGap: 10,
+        rowGap: 6,
         padding: "11px 0",
         borderBottom: "1px solid var(--divider)",
         opacity: isDone ? 0.5 : 1,
@@ -269,6 +272,7 @@ export function TaskRow({
         style={{
           width: 17,
           height: 17,
+          marginTop: 3,
           borderRadius: "50%",
           flexShrink: 0,
           border: isDone ? "none" : "1.5px solid var(--border-strong)",
@@ -290,11 +294,13 @@ export function TaskRow({
         )}
       </button>
 
-      <OwnerDotSelect
-        owner={task.owner}
-        onChange={(next) => onUpdateOwner(task.id, next)}
-        disabled={isDone}
-      />
+      <div style={{ marginTop: 1, flexShrink: 0 }}>
+        <OwnerDotSelect
+          owner={task.owner}
+          onChange={(next) => onUpdateOwner(task.id, next)}
+          disabled={isDone}
+        />
+      </div>
 
       <EditableTitle
         value={task.title}
@@ -302,28 +308,39 @@ export function TaskRow({
         muted={isDone}
       />
 
-      <span
-        title={`Created ${new Date(task.created_at).toLocaleString()}`}
+      <div
+        className="task-meta"
         style={{
-          fontSize: 9,
-          fontFamily: "'IBM Plex Mono', monospace",
-          color: "var(--text-subtle)",
-          letterSpacing: "0.08em",
-          whiteSpace: "nowrap",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
           flexShrink: 0,
-          opacity: 0.7,
+          marginTop: 2,
         }}
       >
-        {formatCreatedAt(task.created_at)}
-      </span>
+        <span
+          title={`Created ${new Date(task.created_at).toLocaleString()}`}
+          style={{
+            fontSize: 9,
+            fontFamily: "'IBM Plex Mono', monospace",
+            color: "var(--text-subtle)",
+            letterSpacing: "0.08em",
+            whiteSpace: "nowrap",
+            opacity: 0.7,
+          }}
+        >
+          {formatCreatedAt(task.created_at)}
+        </span>
 
-      <TagPillSelect
-        tag={task.context}
-        onChange={(next) => onUpdateContext(task.id, next)}
-        disabled={isDone}
-      />
+        <TagPillSelect
+          tag={task.context}
+          onChange={(next) => onUpdateContext(task.id, next)}
+          disabled={isDone}
+        />
+      </div>
 
       <button
+        className="task-delete"
         onClick={() => onDelete(task.id)}
         aria-label="Delete task"
         style={{

@@ -60,3 +60,13 @@ select option { background: var(--surface); color: var(--text-primary); }
   0%, 100% { opacity: 0.15; transform: scale(0.7); }
   50%      { opacity: 1;    transform: scale(1);   }
 }
+
+/* Touch devices: always show delete (no hover), and ensure the wrapped meta
+   row aligns with the title (indented past checkbox + owner). */
+@media (hover: none), (max-width: 640px) {
+  .task-row .task-delete { color: var(--text-muted) !important; opacity: 0.55; }
+}
+
+@media (max-width: 640px) {
+  .task-row .task-meta { margin-left: 49px; }
+}
