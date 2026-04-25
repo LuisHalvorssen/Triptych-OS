@@ -2,7 +2,7 @@
 
 **Read this first when starting a new Claude session on this project.** It captures everything a fresh agent needs to be productive in 5 minutes instead of re-exploring.
 
-Last updated: 2026-04-24
+Last updated: 2026-04-25
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: 2026-04-24
 5. **Vercel project:** `luishalvorssens-projects/triptych-os` — auto-deploys on push to `main`
 6. **Before you edit anything:** read [README.md](../README.md), then this file, then skim [app/page.tsx](../app/page.tsx). Then read the section [§8 Hard rules](#8-hard-rules).
 
-If the user asks to pick up where we left off, the current work stream is **UI/UX improvements via a sequence of 13 `.md` prompts** (see [§9](#9-current-work-stream)). Prompt 01 is done; prompt 02 is next.
+If the user asks to pick up where we left off, the current work stream is **UI/UX improvements via a sequence of 13 `.md` prompts** (see [§9](#9-current-work-stream)). Prompts 01-04 are done; prompt 05 (context tag colors) is next.
 
 ---
 
@@ -174,10 +174,10 @@ User has a planned sequence of 13 prompts at `/Users/luishalvorssen/Library/Appl
 | # | File | Status |
 |---|---|---|
 | 01 | `01-mobile-responsive-foundation.md` | ✅ shipped (commit `d2bfc82`) |
-| 02 | `02-hover-and-touch-states.md` | ⏳ next |
-| 03 | `03-typography-hierarchy.md` | pending |
-| 04 | `04-card-contrast-and-spacing.md` | pending |
-| 05 | `05-context-tag-colors.md` | pending |
+| 02 | `02-hover-and-touch-states.md` | ✅ shipped (commit `9b6a757`) |
+| 03 | `03-typography-hierarchy.md` | ✅ shipped (commit `daa36d5`) |
+| 04 | `04-card-contrast-and-spacing.md` | ✅ shipped (commit `e870fd2` + follow-up `eed28cb` making rows transparent on the card) |
+| 05 | `05-context-tag-colors.md` | ⏳ next |
 | 06 | `06-completion-animation.md` | pending (partial: swipe handler is in place via prompt 01) |
 | 07 | `07-enter-to-submit-and-input-polish.md` | pending |
 | 08 | `08-inline-edit-fix.md` | pending |
@@ -270,16 +270,39 @@ curl -s -X POST https://tasks.triptychmgmt.com/api/gate \
 Commit log so a future Claude can quickly see what shipped:
 
 ```
+eed28cb  Fix: rows transparent on card surface
+e870fd2  Prompt 04: Card elevation, dividers, and row spacing
+daa36d5  Prompt 03: Typography hierarchy in task list
+9b6a757  Prompt 02: Hover (desktop) and touch (mobile) states for task rows
+6580029  Add docs/SESSION-CONTEXT.md — handoff for future Claude sessions
 d2bfc82  Prompt 01: Responsive foundation — mobile-first layout
 343b904  P1: ConfigMissing screen + toast error surfacing with rollback
 88ba7a6  P1 quick wins: README, CI workflow, ungit .claude, ESLint 9 migration
 cdac731  Upgrade Next.js 14.2.15 → 16.2.4 + ESLint 9
 f7ba687  Add shared-password gate via Edge Middleware
-91055d9  Test auto-deploy on private repo
-fab18f9  Ignore .claude/settings.local.json and add .vercelignore
-b0f8571  Mobile: wrap long titles, stack meta below on narrow screens
 fe654ce  Initial commit: Triptych OS
 ```
+
+### CSS tokens added by the UX pass
+
+These are referenced throughout `app/globals.css` and inline styles in
+`TaskRow.tsx` / `TaskList.tsx`. Both themes define them.
+
+| Token | Light | Dark | Used for |
+|---|---|---|---|
+| `--task-title` | `#1A1A2E` | `#E8E8E8` | Task title text (Prompt 03) |
+| `--task-date` | `#999999` | `#777777` | Date metadata text (Prompt 03) |
+| `--card-bg` | `#FFFFFF` | `#111139` | Task list card surface (Prompt 04) |
+| `--row-divider` | `#EAEAEA` | `rgba(255,255,255,0.08)` | Row borders, tabs underline, header bottom (Prompt 04) |
+| `--card-shadow` | layered rgba | `0 1px 3px rgba(0,0,0,0.3)` | Card elevation desktop (Prompt 04) |
+| `--card-shadow-mobile` | `0 1px 2px rgba(0,0,0,0.04)` | `0 1px 2px rgba(0,0,0,0.2)` | Card elevation mobile (Prompt 04) |
+
+Hover/active feedback for rows lives in `globals.css` under
+`@media (hover: hover)` and `@media (hover: none)` blocks (Prompt 02).
+Do not move it back into React state — CSS owns it.
+
+Task rows use `background: transparent` so they inherit the card
+surface; the hover overlay paints rgba on top.
 
 ---
 
