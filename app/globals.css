@@ -170,6 +170,189 @@ select option { background: var(--surface); color: var(--text-primary); }
 }
 
 /* =========================================================================
+   Top 3 priorities billboard. Same surface as task list card, plus a
+   blue top accent. Lives between the input and the task list.
+   ========================================================================= */
+.priorities-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  border-top: 2px solid var(--accent-blue);
+  overflow: hidden;
+  padding: 14px 18px 10px;
+}
+@media (max-width: 639px) {
+  .priorities-card {
+    border-radius: 0;
+    box-shadow: var(--card-shadow-mobile);
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+.priorities-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--row-divider);
+  margin-bottom: 4px;
+}
+.priorities-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent-blue);
+}
+.priorities-update {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+@media (max-width: 639px) {
+  .priorities-update { display: none; }
+}
+
+.priorities-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.priority-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--row-divider);
+  cursor: grab;
+  position: relative;
+  transition: background-color 150ms ease;
+}
+.priority-row:last-child { border-bottom: none; }
+.priority-row-empty { cursor: default; }
+.priority-row-empty .priority-empty-label {
+  flex: 1;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8125rem;
+  color: var(--text-subtle);
+  border: 1px dashed var(--row-divider);
+  border-radius: 4px;
+  padding: 8px 12px;
+  text-align: center;
+}
+.priority-row-dragging { opacity: 0.4; cursor: grabbing; }
+.priority-row-over::before {
+  content: "";
+  position: absolute;
+  inset: -1px 0;
+  background: rgba(44, 59, 211, 0.06);
+  border: 1px dashed var(--accent-blue);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.priority-slot-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  min-width: 26px;
+  flex-shrink: 0;
+}
+.priority-owner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.priority-title {
+  flex: 1 1 0;
+  min-width: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--task-title);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.priority-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.priority-tag-pill {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.priority-unpin {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.12s, opacity 0.15s ease;
+}
+@media (hover: hover) {
+  .priority-unpin { opacity: 0; }
+  .priority-row:hover .priority-unpin { opacity: 1; }
+  .priority-unpin:hover { color: var(--accent-red); }
+}
+@media (hover: none) {
+  .priority-unpin { opacity: 0.55; }
+}
+
+.priority-move { display: none; }
+@media (hover: none) {
+  .priority-move {
+    display: inline-flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    margin-left: 4px;
+  }
+  .priority-move-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 6px;
+    font-size: 9px;
+    line-height: 1.1;
+  }
+  .priority-move-btn:disabled { color: var(--text-subtle); cursor: default; }
+}
+
+@media (max-width: 639px) {
+  .priority-row { padding: 12px 0; gap: 10px; }
+  .priority-slot-num { font-size: 0.8125rem; min-width: 22px; }
+  .priority-title { font-size: 0.875rem; }
+}
+
+/* =========================================================================
    Task list card — distinct elevated surface around the list.
    Mobile: edge-to-edge (negate container 16px gutter), no radius, lighter shadow.
    ========================================================================= */
@@ -205,11 +388,20 @@ select option { background: var(--surface); color: var(--text-primary); }
   min-height: 44px;
   cursor: pointer;
 }
-.task-row .task-delete {
+.task-row .task-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
   opacity: 0;
-  transition: opacity 150ms ease, color 0.12s;
+  transition: opacity 150ms ease;
+}
+.task-row .task-delete,
+.task-row .task-pin {
+  transition: color 0.12s;
   color: var(--text-muted);
 }
+.task-row .task-pin.task-pin-active { color: var(--accent-blue); }
 @media (max-width: 639px) {
   .task-row {
     min-height: 56px;
@@ -277,8 +469,9 @@ select option { background: var(--surface); color: var(--text-primary); }
   }
   .task-row-inner { transition: background-color 150ms ease, transform 0.18s ease-out, opacity 0.2s !important; }
 
-  .task-row:hover .task-delete { opacity: 1; }
+  .task-row:hover .task-actions { opacity: 1; }
   .task-row .task-delete:hover { color: var(--accent-red) !important; }
+  .task-row .task-pin:hover { color: var(--accent-blue) !important; }
 
   .task-row .task-checkbox:hover .task-checkbox-visual {
     border-color: #E8530E !important;
@@ -297,7 +490,7 @@ select option { background: var(--surface); color: var(--text-primary); }
     background: rgba(255, 255, 255, 0.06) !important;
     transition: background-color 80ms ease;
   }
-  .task-row .task-delete { opacity: 0.55 !important; }
+  .task-row .task-actions { opacity: 0.55 !important; }
 }
 
 /* =========================================================================

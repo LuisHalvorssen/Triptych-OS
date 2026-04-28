@@ -7,11 +7,14 @@ import type { ContextTag, Task, TeamMember } from "@/lib/types";
 
 interface Props {
   task: Task;
+  isPinned: boolean;
+  canPin: boolean; // false when 3 slots full and this task is not already pinned
   onToggleDone: (id: string, nextDone: boolean) => void;
   onUpdateTitle: (id: string, title: string) => void;
   onUpdateOwner: (id: string, owner: TeamMember) => void;
   onUpdateContext: (id: string, context: ContextTag) => void;
   onDelete: (id: string) => void;
+  onTogglePin: (id: string, isCurrentlyPinned: boolean) => void;
 }
 
 function formatCreatedAt(iso: string): string {
@@ -246,11 +249,14 @@ function EditableTitle({
 
 export function TaskRow({
   task,
+  isPinned,
+  canPin,
   onToggleDone,
   onUpdateTitle,
   onUpdateOwner,
   onUpdateContext,
   onDelete,
+  onTogglePin,
 }: Props) {
   const isDone = task.status === "Done";
 
@@ -394,22 +400,49 @@ export function TaskRow({
           </span>
         </div>
 
-        <button
-          className="task-delete tap-target"
-          onClick={() => onDelete(task.id)}
-          aria-label="Delete task"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 15,
-            lineHeight: 1,
-            padding: "0 2px",
-            flexShrink: 0,
-          }}
-        >
-          ×
-        </button>
+        <div className="task-actions">
+          <button
+            className={`task-pin tap-target${isPinned ? " task-pin-active" : ""}`}
+            onClick={() => onTogglePin(task.id, isPinned)}
+            disabled={!isPinned && !canPin}
+            aria-label={isPinned ? "Unpin from Top 3" : "Pin to Top 3"}
+            title={
+              isPinned
+                ? "Unpin from Top 3"
+                : canPin
+                  ? "Pin to Top 3"
+                  : "Top 3 is full"
+            }
+            style={{
+              background: "none",
+              border: "none",
+              cursor: !isPinned && !canPin ? "default" : "pointer",
+              fontSize: 13,
+              lineHeight: 1,
+              padding: "0 4px",
+              flexShrink: 0,
+              opacity: !isPinned && !canPin ? 0.35 : undefined,
+            }}
+          >
+            {isPinned ? "★" : "☆"}
+          </button>
+          <button
+            className="task-delete tap-target"
+            onClick={() => onDelete(task.id)}
+            aria-label="Delete task"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 15,
+              lineHeight: 1,
+              padding: "0 2px",
+              flexShrink: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
       </div>
     </div>
   );

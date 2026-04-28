@@ -32,3 +32,12 @@ export interface CategorizeRequest {
 export interface CategorizeResponse {
   context_tag: ContextTag;
 }
+
+export type SlotNumber = 1 | 2 | 3;
+
+export interface TopPriority {
+  slot: SlotNumber;
+  task_id: string;
+  pinned_at: string;
+  pinned_by: string;
+}

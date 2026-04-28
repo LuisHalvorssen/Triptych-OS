@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type ToastKind = "error" | "success";
+export type ToastKind = "error" | "success" | "info";
 
 export interface ToastItem {
   id: string;
@@ -42,6 +42,7 @@ export function dismiss(id: string): void {
 export const toast = {
   error: (m: string, ttl?: number) => push("error", m, ttl),
   success: (m: string, ttl?: number) => push("success", m, ttl),
+  info: (m: string, ttl?: number) => push("info", m, ttl),
 };
 
 export function useToasts(): ToastItem[] {

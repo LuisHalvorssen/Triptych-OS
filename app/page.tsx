@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { TaskInput } from "@/components/TaskInput";
 import { TaskList } from "@/components/TaskList";
 import { Toaster } from "@/components/Toaster";
+import { TopPriorities, type PrioritySlot } from "@/components/TopPriorities";
 import { UserSelector } from "@/components/UserSelector";
 import { DEFAULT_TAG } from "@/lib/constants";
 import { readUserCookie, writeUserCookie } from "@/lib/cookies";
@@ -20,8 +21,10 @@ import { toast } from "@/lib/toast";
 import type {
   CategorizeResponse,
   ContextTag,
+  SlotNumber,
   Task,
   TeamMember,
+  TopPriority,
 } from "@/lib/types";
 
 export default function HomePage() {
@@ -29,6 +32,7 @@ export default function HomePage() {
   const [theme, setTheme] = useState<Theme>("dark");
   const [hydrated, setHydrated] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [priorities, setPriorities] = useState<TopPriority[]>([]);
 
   /* eslint-disable react-hooks/set-state-in-effect --
    * Hydrating from document.cookie, which only exists after mount. Initial
@@ -56,6 +60,15 @@ export default function HomePage() {
         console.error("[tasks] load error:", error);
         toast.error("Couldn't load tasks");
       }
+
+      // Priorities: silent failure if the table isn't migrated yet
+      // (rolling deploy — UI degrades to an empty billboard).
+      const { data: pdata, error: perror } = await supabase
+        .from("top_priorities")
+        .select("*")
+        .order("slot");
+      if (!cancelled && !perror && pdata) setPriorities(pdata as TopPriority[]);
+      if (perror) console.warn("[priorities] load skipped:", perror.message);
     }
     load();
 
@@ -85,9 +98,40 @@ export default function HomePage() {
       )
       .subscribe();
 
+    const pchannel = supabase
+      .channel("priorities-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "top_priorities" },
+        (payload) => {
+          setPriorities((prev) => {
+            if (payload.eventType === "INSERT") {
+              const row = payload.new as TopPriority;
+              return [...prev.filter((p) => p.slot !== row.slot), row].sort(
+                (a, b) => a.slot - b.slot
+              );
+            }
+            if (payload.eventType === "UPDATE") {
+              const row = payload.new as TopPriority;
+              return prev
+                .filter((p) => p.slot !== row.slot)
+                .concat(row)
+                .sort((a, b) => a.slot - b.slot);
+            }
+            if (payload.eventType === "DELETE") {
+              const row = payload.old as Partial<TopPriority>;
+              if (row.slot != null) return prev.filter((p) => p.slot !== row.slot);
+            }
+            return prev;
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
+      supabase.removeChannel(pchannel);
     };
   }, [hydrated]);
 
@@ -187,6 +231,87 @@ export default function HomePage() {
     [patchTask]
   );
 
+  const handleTogglePin = useCallback(
+    async (taskId: string, isCurrentlyPinned: boolean) => {
+      if (isCurrentlyPinned) {
+        const existing = priorities.find((p) => p.task_id === taskId);
+        if (!existing) return;
+        const slot = existing.slot;
+        setPriorities((prev) => prev.filter((p) => p.slot !== slot));
+        const { error } = await supabase
+          .from("top_priorities")
+          .delete()
+          .eq("slot", slot);
+        if (error) {
+          console.error("[priorities] unpin error:", error);
+          toast.error("Couldn't unpin");
+          setPriorities((prev) =>
+            prev.some((p) => p.slot === slot)
+              ? prev
+              : [...prev, existing].sort((a, b) => a.slot - b.slot)
+          );
+        }
+        return;
+      }
+
+      // Pin: find lowest empty slot
+      const used = new Set(priorities.map((p) => p.slot));
+      const slot = ([1, 2, 3] as SlotNumber[]).find((s) => !used.has(s));
+      if (!slot) {
+        toast.info("Top 3 full — unpin one first");
+        return;
+      }
+      const optimistic: TopPriority = {
+        slot,
+        task_id: taskId,
+        pinned_at: new Date().toISOString(),
+        pinned_by: currentUser ?? "unknown",
+      };
+      setPriorities((prev) =>
+        [...prev.filter((p) => p.slot !== slot), optimistic].sort(
+          (a, b) => a.slot - b.slot
+        )
+      );
+      const { error } = await supabase.from("top_priorities").insert({
+        slot,
+        task_id: taskId,
+        pinned_by: currentUser ?? "unknown",
+      });
+      if (error) {
+        console.error("[priorities] pin error:", error);
+        toast.error("Couldn't pin");
+        setPriorities((prev) => prev.filter((p) => p.slot !== slot));
+      }
+    },
+    [priorities, currentUser]
+  );
+
+  const handleReorderPriorities = useCallback(
+    async (from: SlotNumber, to: SlotNumber) => {
+      if (from === to) return;
+      const snap = priorities;
+      setPriorities((prev) =>
+        prev
+          .map((p) => {
+            if (p.slot === from) return { ...p, slot: to };
+            if (p.slot === to) return { ...p, slot: from };
+            return p;
+          })
+          .sort((a, b) => a.slot - b.slot)
+      );
+      const { error } = await supabase.rpc("swap_priority_slots", {
+        slot_a: from,
+        slot_b: to,
+      });
+      if (error) {
+        console.error("[priorities] reorder error:", error);
+        toast.error("Couldn't reorder");
+        setPriorities(snap);
+      }
+    },
+    [priorities]
+  );
+
   const handleDelete = useCallback(async (id: string) => {
     let removed: Task | undefined;
     setTasks((prev) => {
@@ -221,6 +346,24 @@ export default function HomePage() {
     );
   }
 
+  const slots: PrioritySlot[] = ([1, 2, 3] as SlotNumber[]).map((slot) => {
+    const p = priorities.find((x) => x.slot === slot);
+    const task = p ? tasks.find((t) => t.id === p.task_id) ?? null : null;
+    return {
+      slot,
+      task,
+      pinnedBy: p?.pinned_by,
+      pinnedAt: p?.pinned_at,
+    };
+  });
+  const pinnedTaskIds = new Set(priorities.map((p) => p.task_id));
+  const prioritiesFull = priorities.length >= 3;
+  const lastUpdate = priorities.length
+    ? priorities
+        .slice()
+        .sort((a, b) => (a.pinned_at < b.pinned_at ? 1 : -1))[0]
+    : null;
+
   return (
     <div className="app-shell">
       <Header
@@ -230,14 +373,30 @@ export default function HomePage() {
         onToggleTheme={handleToggleTheme}
       />
       <TaskInput currentUser={currentUser} onCreate={handleCreate} />
+      <TopPriorities
+        slots={slots}
+        onUnpin={(slot) => {
+          const p = priorities.find((x) => x.slot === slot);
+          if (p) handleTogglePin(p.task_id, true);
+        }}
+        onReorder={handleReorderPriorities}
+        lastUpdate={
+          lastUpdate
+            ? { by: lastUpdate.pinned_by, at: lastUpdate.pinned_at }
+            : null
+        }
+      />
       <TaskList
         tasks={tasks}
         currentUser={currentUser}
+        pinnedTaskIds={pinnedTaskIds}
+        prioritiesFull={prioritiesFull}
         onToggleDone={handleToggleDone}
         onUpdateTitle={handleUpdateTitle}
         onUpdateOwner={handleUpdateOwner}
         onUpdateContext={handleUpdateContext}
         onDelete={handleDelete}
+        onTogglePin={handleTogglePin}
       />
       <Toaster />
     </div>

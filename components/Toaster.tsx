@@ -30,15 +30,20 @@ export function Toaster() {
 }
 
 function ToastPill({ item }: { item: ToastItem }) {
-  const isError = item.kind === "error";
+  const accent =
+    item.kind === "error"
+      ? "var(--accent-red)"
+      : item.kind === "info"
+        ? "var(--accent-blue)"
+        : "#3A8A5A";
   return (
     <button
       onClick={() => dismiss(item.id)}
       style={{
         pointerEvents: "auto",
         background: "var(--surface)",
-        border: `1px solid ${isError ? "var(--accent-red)" : "#3A8A5A"}`,
-        color: isError ? "var(--accent-red)" : "#3A8A5A",
+        border: `1px solid ${accent}`,
+        color: accent,
         padding: "10px 16px",
         borderRadius: 3,
         fontSize: 11,

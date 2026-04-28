@@ -12,11 +12,14 @@ type Tab = "active" | "closed";
 interface Props {
   tasks: Task[];
   currentUser: TeamMember;
+  pinnedTaskIds: Set<string>;
+  prioritiesFull: boolean;
   onToggleDone: (id: string, nextDone: boolean) => Promise<void>;
   onUpdateTitle: (id: string, title: string) => Promise<void>;
   onUpdateOwner: (id: string, owner: TeamMember) => Promise<void>;
   onUpdateContext: (id: string, context: ContextTag) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onTogglePin: (id: string, isCurrentlyPinned: boolean) => void;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -131,11 +134,14 @@ function ContextFilterSelect({
 export function TaskList({
   tasks,
   currentUser,
+  pinnedTaskIds,
+  prioritiesFull,
   onToggleDone,
   onUpdateTitle,
   onUpdateOwner,
   onUpdateContext,
   onDelete,
+  onTogglePin,
 }: Props) {
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
   const [contextFilter, setContextFilter] = useState<ContextFilter>("all");
@@ -310,17 +316,23 @@ export function TaskList({
             {tab === "active" ? "no active tasks" : "no closed tasks"}
           </div>
         ) : (
-          visible.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onToggleDone={onToggleDone}
-              onUpdateTitle={onUpdateTitle}
-              onUpdateOwner={onUpdateOwner}
-              onUpdateContext={onUpdateContext}
-              onDelete={onDelete}
-            />
-          ))
+          visible.map((task) => {
+            const isPinned = pinnedTaskIds.has(task.id);
+            return (
+              <TaskRow
+                key={task.id}
+                task={task}
+                isPinned={isPinned}
+                canPin={!prioritiesFull}
+                onToggleDone={onToggleDone}
+                onUpdateTitle={onUpdateTitle}
+                onUpdateOwner={onUpdateOwner}
+                onUpdateContext={onUpdateContext}
+                onDelete={onDelete}
+                onTogglePin={onTogglePin}
+              />
+            );
+          })
         )}
       </div>
       </div>
