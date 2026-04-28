@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react";
 
-export type ToastKind = "error" | "success" | "info";
+export type ToastKind = "error" | "success" | "info" | "action";
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface ToastItem {
   id: string;
   kind: ToastKind;
   message: string;
+  action?: ToastAction;
 }
 
 const DEFAULT_TTL_MS = 4000;
@@ -24,9 +30,14 @@ function emit() {
   listeners.forEach((l) => l(snapshot));
 }
 
-function push(kind: ToastKind, message: string, ttl = DEFAULT_TTL_MS): string {
+function push(
+  kind: ToastKind,
+  message: string,
+  ttl = DEFAULT_TTL_MS,
+  action?: ToastAction
+): string {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  toasts = [...toasts, { id, kind, message }];
+  toasts = [...toasts, { id, kind, message, action }];
   emit();
   if (ttl > 0) {
     setTimeout(() => dismiss(id), ttl);
@@ -43,6 +54,9 @@ export const toast = {
   error: (m: string, ttl?: number) => push("error", m, ttl),
   success: (m: string, ttl?: number) => push("success", m, ttl),
   info: (m: string, ttl?: number) => push("info", m, ttl),
+  /** Toast with an inline action button, e.g. "Task completed · Undo". */
+  action: (m: string, action: ToastAction, ttl = 4000) =>
+    push("action", m, ttl, action),
 };
 
 export function useToasts(): ToastItem[] {

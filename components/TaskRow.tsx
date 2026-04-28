@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { OWNER_COLORS, TAGS, TEAM, tagShortName, tagStyle } from "@/lib/constants";
+import { toast } from "@/lib/toast";
 import { useSwipe } from "@/lib/useSwipe";
 import type { ContextTag, Task, TeamMember } from "@/lib/types";
+
+// Total animation duration: 200ms checkbox + 200ms strikethrough +
+// 200ms fade-slide. Slight buffer so the row is fully transparent
+// before the underlying state flips it into Closed.
+const COMPLETE_ANIMATION_MS = 600;
 
 interface Props {
   task: Task;
@@ -260,20 +266,47 @@ export function TaskRow({
   onTogglePin,
 }: Props) {
   const isDone = task.status === "Done";
+  const [completing, setCompleting] = useState(false);
+  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Run the orange-pop / strikethrough / fade-slide animation, then
+  // commit the state change and show an undo toast. Guarded so rapid
+  // clicks or fast swipes don't double-fire.
+  const triggerComplete = useCallback(() => {
+    if (completing || isDone) return;
+    setCompleting(true);
+    completeTimerRef.current = setTimeout(() => {
+      onToggleDone(task.id, true);
+      toast.action(
+        "Task completed",
+        {
+          label: "Undo",
+          onClick: () => onToggleDone(task.id, false),
+        },
+        4000
+      );
+    }, COMPLETE_ANIMATION_MS);
+  }, [completing, isDone, onToggleDone, task.id]);
+
+  useEffect(() => {
+    return () => {
+      if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    };
+  }, []);
 
   // Swipe-right-to-complete on touch devices. Disabled when the row is
-  // already done (so you can't double-fire the action). Caps the visual
-  // translate at 120px so the row can't fly off-screen.
+  // already done or already animating. Caps the visual translate at
+  // 120px so the row can't fly off-screen.
   const swipe = useSwipe({
-    onCompleteRight: isDone ? undefined : () => onToggleDone(task.id, true),
-    threshold: 80,
+    onCompleteRight: isDone || completing ? undefined : triggerComplete,
+    threshold: 100,
   });
   const dx = isDone ? 0 : Math.max(0, Math.min(swipe.state.dx, 120));
   const showSwipeBg = dx > 0;
 
   return (
     <div
-      className="task-row-swipe"
+      className={`task-row-swipe${completing ? " completing" : ""}`}
       data-swipe-active={showSwipeBg ? "true" : "false"}
       {...swipe.handlers}
       style={{
@@ -288,9 +321,9 @@ export function TaskRow({
             inset: 0,
             display: "flex",
             alignItems: "center",
-            paddingLeft: 16,
-            color: "#3A8A5A",
-            fontSize: 18,
+            paddingLeft: 18,
+            color: "#FFFFFF",
+            fontSize: 20,
             fontWeight: 700,
             pointerEvents: "none",
           }}
@@ -315,7 +348,13 @@ export function TaskRow({
         }}
       >
         <button
-          onClick={() => onToggleDone(task.id, !isDone)}
+          onClick={() => {
+            if (isDone) {
+              onToggleDone(task.id, false);
+            } else {
+              triggerComplete();
+            }
+          }}
           aria-label={isDone ? "Mark as active" : "Mark as done"}
           className="task-checkbox"
           style={{

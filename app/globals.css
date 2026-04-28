@@ -28,7 +28,7 @@ html[data-theme="dark"] {
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   --card-shadow-mobile: 0 1px 2px rgba(0, 0, 0, 0.2);
 
-  --swipe-complete: rgba(58, 138, 90, 0.35);
+  --swipe-complete: #22C55E;
 }
 
 html[data-theme="light"] {
@@ -56,7 +56,7 @@ html[data-theme="light"] {
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --card-shadow-mobile: 0 1px 2px rgba(0, 0, 0, 0.04);
 
-  --swipe-complete: rgba(58, 138, 90, 0.28);
+  --swipe-complete: #22C55E;
 }
 
 * { box-sizing: border-box; }
@@ -90,6 +90,75 @@ select option { background: var(--surface); color: var(--text-primary); }
 @keyframes tp-toast-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Task completion animation ====================================== */
+@keyframes tp-checkbox-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+@keyframes tp-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tp-strike {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+/* Stage 1: checkbox bounces and fills with Triptych orange. */
+.completing .task-checkbox-visual {
+  animation: tp-checkbox-pop 200ms ease-out forwards;
+  background: #E8530E !important;
+  border-color: #E8530E !important;
+  position: relative;
+}
+.completing .task-checkbox-visual::before {
+  content: "✓";
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: 'Syne', sans-serif;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: tp-fadein 150ms 80ms ease-out both;
+}
+@media (max-width: 639px) {
+  .completing .task-checkbox-visual::before { font-size: 14px; }
+}
+
+/* Stage 2: strikethrough sweeps title left to right; color fades muted. */
+.completing .task-title-btn {
+  position: relative;
+  color: var(--text-muted) !important;
+  transition: color 200ms ease 100ms;
+}
+.completing .task-title-btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1px;
+  background: currentColor;
+  width: 0;
+  animation: tp-strike 200ms 100ms ease-out forwards;
+  pointer-events: none;
+}
+
+/* Stage 3: row fades out and slides up. */
+.completing.task-row-swipe {
+  transition: opacity 200ms ease 400ms, transform 200ms ease 400ms;
+  opacity: 0;
+  transform: translateY(-8px);
+}
+/* Inner row inherits the fade so the bg shows through cleanly during the
+   exit; otherwise the inline transparent bg can flicker on transform. */
+.completing .task-row-inner {
+  pointer-events: none;
 }
 
 /* =========================================================================
@@ -521,4 +590,17 @@ select option { background: var(--surface); color: var(--text-primary); }
 /* Minimum tap target for anything that looks tappable. */
 @media (max-width: 639px) {
   .tap-target { min-width: 44px; min-height: 44px; }
+}
+
+/* Toaster positioning: bottom-anchored, safe-area aware on mobile,
+   full-width minus 16px gutter on small screens. */
+.toaster-root {
+  bottom: 24px;
+}
+@media (max-width: 639px) {
+  .toaster-root {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    width: calc(100% - 32px);
+  }
+  .toaster-root .action-toast { width: 100%; }
 }
