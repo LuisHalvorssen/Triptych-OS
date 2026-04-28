@@ -161,6 +161,18 @@ select option { background: var(--surface); color: var(--text-primary); }
   pointer-events: none;
 }
 
+/* Soft-delete exit animation. The row stays in tasks state during the
+   200ms while .deleting is set; after that it's hidden via pendingDeletes
+   in app/page.tsx. */
+.deleting.task-row-swipe {
+  transition: opacity 200ms ease, transform 200ms ease;
+  opacity: 0;
+  transform: translateX(20px);
+}
+.deleting .task-row-inner {
+  pointer-events: none;
+}
+
 /* =========================================================================
    Responsive container — mobile full-bleed, tablet 680, desktop 900.
    ========================================================================= */
@@ -731,8 +743,11 @@ html[data-theme="dark"] .task-title-input {
   background: transparent;
   transition: background-color 0.15s ease;
 }
-.task-row-swipe[data-swipe-active="true"] {
-  background: var(--swipe-complete);
+.task-row-swipe[data-swipe-direction="right"] {
+  background: #22C55E; /* swipe-right-to-complete */
+}
+.task-row-swipe[data-swipe-direction="left"] {
+  background: #EF4444; /* swipe-left-to-delete */
 }
 .task-row-swipe .task-row-inner {
   transition: transform 0.18s ease-out;

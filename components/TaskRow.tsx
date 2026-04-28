@@ -29,6 +29,7 @@ interface Props {
   task: Task;
   isPinned: boolean;
   canPin: boolean; // false when 3 slots full and this task is not already pinned
+  isDeleting: boolean; // true during the 200ms exit animation before the row is hidden
   onToggleDone: (id: string, nextDone: boolean) => void;
   onUpdateTitle: (id: string, title: string) => void;
   onUpdateOwner: (id: string, owner: TeamMember) => void;
@@ -333,6 +334,7 @@ export function TaskRow({
   task,
   isPinned,
   canPin,
+  isDeleting,
   onToggleDone,
   onUpdateTitle,
   onUpdateOwner,
@@ -369,15 +371,20 @@ export function TaskRow({
     };
   }, []);
 
-  // Swipe-right-to-complete on touch devices. Disabled when the row is
-  // already done or already animating. Caps the visual translate at
-  // 120px so the row can't fly off-screen.
+  // Swipe-right-to-complete + swipe-left-to-delete on touch devices.
+  // Both disabled when the row is already animating out or done.
+  // Direction becomes unambiguous once the user moves >0px in either axis.
   const swipe = useSwipe({
-    onCompleteRight: isDone || completing ? undefined : triggerComplete,
+    onCompleteRight:
+      isDone || completing || isDeleting ? undefined : triggerComplete,
+    onCompleteLeft:
+      completing || isDeleting ? undefined : () => onDelete(task.id),
     threshold: 100,
   });
-  const dx = isDone ? 0 : Math.max(0, Math.min(swipe.state.dx, 120));
-  const showSwipeBg = dx > 0;
+  const rawDx = isDone || completing || isDeleting ? 0 : swipe.state.dx;
+  const dx = Math.max(-120, Math.min(rawDx, 120));
+  const swipeDirection: "left" | "right" | null =
+    rawDx > 0 ? "right" : rawDx < 0 ? "left" : null;
 
   const isFreshlyCreated =
     Date.parse(task.created_at) > PAGE_MOUNT_TIME;
@@ -385,14 +392,14 @@ export function TaskRow({
 
   return (
     <div
-      className={`task-row-swipe${completing ? " completing" : ""}${isFreshlyCreated ? " task-row-new" : ""}`}
-      data-swipe-active={showSwipeBg ? "true" : "false"}
+      className={`task-row-swipe${completing ? " completing" : ""}${isDeleting ? " deleting" : ""}${isFreshlyCreated ? " task-row-new" : ""}`}
+      data-swipe-direction={swipeDirection ?? "none"}
       {...swipe.handlers}
       style={{
         borderBottom: "1px solid var(--row-divider)",
       }}
     >
-      {showSwipeBg && (
+      {swipeDirection === "right" && (
         <div
           aria-hidden="true"
           style={{
@@ -408,6 +415,28 @@ export function TaskRow({
           }}
         >
           ✓
+        </div>
+      )}
+      {swipeDirection === "left" && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            paddingRight: 18,
+            color: "#FFFFFF",
+            pointerEvents: "none",
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6M14 11v6" />
+            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+          </svg>
         </div>
       )}
       <div

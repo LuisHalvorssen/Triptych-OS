@@ -14,11 +14,12 @@ interface Props {
   currentUser: TeamMember;
   pinnedTaskIds: Set<string>;
   prioritiesFull: boolean;
+  recentlyDeletingIds: Set<string>;
   onToggleDone: (id: string, nextDone: boolean) => Promise<void>;
   onUpdateTitle: (id: string, title: string) => Promise<void>;
   onUpdateOwner: (id: string, owner: TeamMember) => Promise<void>;
   onUpdateContext: (id: string, context: ContextTag) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: (id: string) => void;
   onTogglePin: (id: string, isCurrentlyPinned: boolean) => void;
 }
 
@@ -136,6 +137,7 @@ export function TaskList({
   currentUser,
   pinnedTaskIds,
   prioritiesFull,
+  recentlyDeletingIds,
   onToggleDone,
   onUpdateTitle,
   onUpdateOwner,
@@ -324,6 +326,7 @@ export function TaskList({
                 task={task}
                 isPinned={isPinned}
                 canPin={!prioritiesFull}
+                isDeleting={recentlyDeletingIds.has(task.id)}
                 onToggleDone={onToggleDone}
                 onUpdateTitle={onUpdateTitle}
                 onUpdateOwner={onUpdateOwner}

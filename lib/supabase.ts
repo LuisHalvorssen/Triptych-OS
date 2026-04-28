@@ -18,3 +18,26 @@ export const supabase = createClient(
   url || "https://placeholder.invalid.supabase.co",
   anonKey || "placeholder-anon-key"
 );
+
+/**
+ * Fire-and-forget DELETE that survives page unload via fetch's `keepalive`
+ * flag. Used by the soft-delete-with-undo path: when a tab is closing and
+ * we still hold pending deletes from the 4-second undo window, we commit
+ * them right now so they don't silently linger in the DB. Returns
+ * immediately — caller doesn't await.
+ */
+export function syncDeleteTaskOnUnload(id: string): void {
+  if (!url || !anonKey) return;
+  try {
+    fetch(`${url}/rest/v1/tasks?id=eq.${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      keepalive: true,
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+    });
+  } catch {
+    // Best-effort. The user is already navigating away.
+  }
+}

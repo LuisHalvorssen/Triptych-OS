@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigMissing } from "@/components/ConfigMissing";
 import { Header } from "@/components/Header";
 import { TaskInput } from "@/components/TaskInput";
@@ -10,14 +10,19 @@ import { TopPriorities, type PrioritySlot } from "@/components/TopPriorities";
 import { UserSelector } from "@/components/UserSelector";
 import { DEFAULT_TAG } from "@/lib/constants";
 import { readUserCookie, writeUserCookie } from "@/lib/cookies";
-import { isSupabaseConfigured, missingSupabaseEnvVars, supabase } from "@/lib/supabase";
+import {
+  isSupabaseConfigured,
+  missingSupabaseEnvVars,
+  supabase,
+  syncDeleteTaskOnUnload,
+} from "@/lib/supabase";
 import {
   applyTheme,
   readThemeCookie,
   writeThemeCookie,
   type Theme,
 } from "@/lib/theme";
-import { toast } from "@/lib/toast";
+import { dismiss as dismissToast, toast } from "@/lib/toast";
 import type {
   CategorizeResponse,
   ContextTag,
@@ -33,6 +38,18 @@ export default function HomePage() {
   const [hydrated, setHydrated] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [priorities, setPriorities] = useState<TopPriority[]>([]);
+
+  // Soft delete state — see handleDelete below.
+  const [pendingDeletes, setPendingDeletes] = useState<Map<string, Task>>(
+    new Map()
+  );
+  const [recentlyDeletingIds, setRecentlyDeletingIds] = useState<Set<string>>(
+    new Set()
+  );
+  const deleteCommitTimersRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map());
+  const deleteToastIdRef = useRef<string | null>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect --
    * Hydrating from document.cookie, which only exists after mount. Initial
@@ -312,24 +329,132 @@ export default function HomePage() {
     [priorities]
   );
 
-  const handleDelete = useCallback(async (id: string) => {
-    let removed: Task | undefined;
-    setTasks((prev) => {
-      removed = prev.find((t) => t.id === id);
-      return prev.filter((t) => t.id !== id);
+  // Commits a previously soft-deleted task to the database.
+  // Called by the 4-second timer or by the page-unload handler.
+  const commitPendingDelete = useCallback(async (id: string, task: Task) => {
+    const t = deleteCommitTimersRef.current.get(id);
+    if (t) clearTimeout(t);
+    deleteCommitTimersRef.current.delete(id);
+    setPendingDeletes((m) => {
+      const next = new Map(m);
+      next.delete(id);
+      return next;
     });
+    setTasks((prev) => prev.filter((x) => x.id !== id));
     const { error } = await supabase.from("tasks").delete().eq("id", id);
     if (error) {
       console.error("[tasks] delete error:", error);
       toast.error("Delete failed");
-      if (removed) {
-        const snapshot = removed;
-        setTasks((prev) =>
-          prev.some((t) => t.id === id) ? prev : [snapshot, ...prev]
-        );
-      }
+      // Restore so the task isn't silently lost on the client. The DB
+      // wasn't touched so realtime won't fix this for us.
+      setTasks((prev) =>
+        prev.some((x) => x.id === id) ? prev : [task, ...prev]
+      );
     }
   }, []);
+
+  const handleUndoDelete = useCallback((id: string) => {
+    const t = deleteCommitTimersRef.current.get(id);
+    if (t) clearTimeout(t);
+    deleteCommitTimersRef.current.delete(id);
+    setPendingDeletes((m) => {
+      if (!m.has(id)) return m;
+      const next = new Map(m);
+      next.delete(id);
+      return next;
+    });
+    setRecentlyDeletingIds((s) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+    if (deleteToastIdRef.current) {
+      dismissToast(deleteToastIdRef.current);
+      deleteToastIdRef.current = null;
+    }
+  }, []);
+
+  // Soft delete. Steps:
+  //   1. Replace any in-flight pending delete (commit it now — keep state simple).
+  //   2. Animate row out via a 200ms .deleting class.
+  //   3. After 200ms, hide the task from the list (filtered via pendingDeletes).
+  //   4. Show a "Task deleted · UNDO" toast for 4 seconds.
+  //   5. After 4 seconds, commit the real DELETE to Supabase.
+  // Undo cancels the timer and restores the task in place.
+  const handleDelete = useCallback(
+    (id: string) => {
+      // Replace pattern: if any prior delete is pending, commit it now
+      // so we don't carry multiple pending deletes simultaneously.
+      pendingDeletes.forEach((prevTask, prevId) => {
+        if (prevId !== id) commitPendingDelete(prevId, prevTask);
+      });
+      if (deleteToastIdRef.current) {
+        dismissToast(deleteToastIdRef.current);
+        deleteToastIdRef.current = null;
+      }
+
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+
+      setRecentlyDeletingIds((s) => new Set(s).add(id));
+      setTimeout(() => {
+        setRecentlyDeletingIds((s) => {
+          if (!s.has(id)) return s;
+          const next = new Set(s);
+          next.delete(id);
+          return next;
+        });
+        setPendingDeletes((m) => {
+          if (m.has(id)) return m;
+          const next = new Map(m);
+          next.set(id, task);
+          return next;
+        });
+      }, 200);
+
+      const timer = setTimeout(() => {
+        commitPendingDelete(id, task);
+        if (deleteToastIdRef.current) {
+          dismissToast(deleteToastIdRef.current);
+          deleteToastIdRef.current = null;
+        }
+      }, 4000);
+      deleteCommitTimersRef.current.set(id, timer);
+
+      deleteToastIdRef.current = toast.action(
+        "Task deleted",
+        {
+          label: "Undo",
+          onClick: () => handleUndoDelete(id),
+        },
+        4000
+      );
+    },
+    [tasks, pendingDeletes, commitPendingDelete, handleUndoDelete]
+  );
+
+  // Page navigation safety: if the tab is closing while soft-deletes are
+  // still in their undo window, fire DELETE requests via fetch keepalive
+  // so the rows actually leave the DB.
+  useEffect(() => {
+    function flushPendingDeletes() {
+      pendingDeletes.forEach((_task, id) => {
+        const t = deleteCommitTimersRef.current.get(id);
+        if (t) clearTimeout(t);
+        syncDeleteTaskOnUnload(id);
+      });
+    }
+    window.addEventListener("beforeunload", flushPendingDeletes);
+    return () => window.removeEventListener("beforeunload", flushPendingDeletes);
+  }, [pendingDeletes]);
+
+  // Tasks pending undoable delete are hidden from the list but kept in
+  // local state so realtime + commit can still find them by id.
+  const visibleTasks = useMemo(
+    () => tasks.filter((t) => !pendingDeletes.has(t.id)),
+    [tasks, pendingDeletes]
+  );
 
   if (!hydrated) return null;
 
@@ -387,10 +512,11 @@ export default function HomePage() {
         }
       />
       <TaskList
-        tasks={tasks}
+        tasks={visibleTasks}
         currentUser={currentUser}
         pinnedTaskIds={pinnedTaskIds}
         prioritiesFull={prioritiesFull}
+        recentlyDeletingIds={recentlyDeletingIds}
         onToggleDone={handleToggleDone}
         onUpdateTitle={handleUpdateTitle}
         onUpdateOwner={handleUpdateOwner}
