@@ -2,7 +2,7 @@
 
 **Read this first when starting a new Claude session on this project.** It captures everything a fresh agent needs to be productive in 5 minutes instead of re-exploring.
 
-Last updated: 2026-04-25
+Last updated: 2026-04-28
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: 2026-04-25
 5. **Vercel project:** `luishalvorssens-projects/triptych-os` — auto-deploys on push to `main`
 6. **Before you edit anything:** read [README.md](../README.md), then this file, then skim [app/page.tsx](../app/page.tsx). Then read the section [§8 Hard rules](#8-hard-rules).
 
-If the user asks to pick up where we left off, the current work stream is **UI/UX improvements via a sequence of 13 `.md` prompts** (see [§9](#9-current-work-stream)). Prompts 01-04 are done; prompt 05 (context tag colors) is next.
+If the user asks to pick up where we left off, the current work stream is **UI/UX improvements via a sequence of 13 `.md` prompts** (see [§9](#9-current-work-stream)). Prompts 01-07 are done; prompt 08 (inline edit fix) is next. The Top 3 Priorities billboard (a feature add, not a prompt) shipped between prompts 04 and 05 — see [§9b](#9b-top-3-priorities).
 
 ---
 
@@ -90,8 +90,57 @@ create table public.tasks (
   created_at timestamptz not null default now()
 );
 
--- Realtime: table is in the supabase_realtime publication
+-- Top 3 priorities billboard. Three-slot ranked pin list shared by all
+-- users; ignores all owner/context filters. PK on slot hard-caps to 3.
+-- task_id unique prevents pinning the same task twice. ON DELETE CASCADE
+-- frees the slot when a task is deleted.
+create table public.top_priorities (
+  slot       int  primary key check (slot in (1, 2, 3)),
+  task_id    uuid not null unique references public.tasks(id) on delete cascade,
+  pinned_at  timestamptz not null default now(),
+  pinned_by  text not null
+);
+
+-- Trigger that drops a task from the billboard the moment its status
+-- flips to Done. Keeps the billboard focused on active work even when
+-- a task is closed via swipe, undo toast, or direct SQL.
+create or replace function public.unpin_on_done()
+returns trigger as $$
+begin
+  if NEW.status = 'Done' and OLD.status <> 'Done' then
+    delete from public.top_priorities where task_id = NEW.id;
+  end if;
+  return NEW;
+end;
+$$ language plpgsql security definer;
+
+create trigger unpin_done_trigger
+  after update of status on public.tasks
+  for each row execute function public.unpin_on_done();
+
+-- Atomic slot swap RPC for reorder-within-billboard. Handles both
+-- swap (both slots occupied) and move-to-empty (one slot empty).
+-- Called from app/page.tsx via supabase.rpc("swap_priority_slots", ...).
+create or replace function public.swap_priority_slots(slot_a int, slot_b int)
+returns void as $$
+declare
+  task_a uuid; task_b uuid; by_a text; by_b text;
+begin
+  select task_id, pinned_by into task_a, by_a from public.top_priorities where slot = slot_a;
+  select task_id, pinned_by into task_b, by_b from public.top_priorities where slot = slot_b;
+  delete from public.top_priorities where slot in (slot_a, slot_b);
+  if task_a is not null then
+    insert into public.top_priorities (slot, task_id, pinned_by) values (slot_b, task_a, by_a);
+  end if;
+  if task_b is not null then
+    insert into public.top_priorities (slot, task_id, pinned_by) values (slot_a, task_b, by_b);
+  end if;
+end;
+$$ language plpgsql security definer;
+
+-- Realtime: both tables are in the supabase_realtime publication
 alter publication supabase_realtime add table public.tasks;
+alter publication supabase_realtime add table public.top_priorities;
 ```
 
 **RLS posture:** effectively permissive. The anon key can read/insert/update/delete all rows. This is safe today *only because* the entire site sits behind the `GATE_PASSWORD` middleware. If you ever remove the gate or expose the anon key publicly, you must migrate to proper RLS policies (see §10).
@@ -113,29 +162,42 @@ middleware.ts                gates every route behind GATE_PASSWORD cookie
 
 components/
   Header                     sticky top bar: wordmark + avatars + theme toggle
-  TaskInput                  owner select + text input + ADD button
-  TaskList                   filter bar (owner/context/tab) + row list + empty state
-  TaskRow                    row: checkbox, owner, title, date, tag, delete, swipe
+  TaskInput                  owner select (with chevron) + text input + ADD button.
+                             Wrapped in <form onSubmit>. Orange focus accent on field.
+  TopPriorities              ranked 3-slot billboard between input and list. Drag-and-drop
+                             reorder on desktop; ▲▼ chevrons on mobile (gated by hover:none).
+  TaskList                   filter bar (owner/context/tab) + row list + empty state.
+                             Wrapped in .task-list-card surface with shadow + radius.
+  TaskRow                    row: checkbox, owner, title, date, tag pill, pin (☆/★),
+                             delete (×), swipe-right-to-complete on touch. Owns the
+                             completion animation and the .task-row-new enter animation.
   UserSelector               first-load "who are you?" screen
   ConfigMissing              fallback when env vars aren't set
-  Toaster                    bottom-center toast stack
+  Toaster                    fixed bottom-center toast stack. error/success/info pills,
+                             plus an "action" variant (dark pill, embedded undo button).
 
 lib/
-  constants.ts               TEAM, TAGS, OWNER_COLORS, STATUS_CONFIG, tagStyle()
-  types.ts                   Task, Status, ContextTag, TeamMember, CategorizeResponse
+  constants.ts               TEAM, TAGS, OWNER_COLORS, STATUS_CONFIG, tagStyle() (theme-
+                             aware, reads data-theme at render), tagShortName() for the
+                             mobile name swap, plus the per-tag light/dark color map.
+  types.ts                   Task, Status, ContextTag, TeamMember, CategorizeResponse,
+                             SlotNumber (1|2|3), TopPriority
   supabase.ts                singleton client + missingSupabaseEnvVars[]
   cookies.ts                 triptych-user cookie read/write
   theme.ts                   triptych-theme cookie read/write + applyTheme()
-  toast.ts                   module-level toast store + useToasts() hook
+  toast.ts                   module-level toast store + useToasts() hook. Variants:
+                             error / success / info / action (with {label, onClick}).
   gate.ts                    SHA-256 gate-token helpers (used by middleware + /api/gate)
-  useSwipe.ts                touch-only left/right swipe gesture hook
+  useSwipe.ts                touch-only left/right swipe gesture hook (threshold 100px,
+                             aborts on >30px Y drift to preserve native scroll)
 ```
 
 **Data flow:**
-1. On mount, `app/page.tsx` reads cookies (user, theme), fetches tasks from Supabase, subscribes to Realtime
-2. User input flows through handlers defined in `page.tsx` that do optimistic state updates + Supabase calls
-3. On Supabase failure, state rolls back and a toast appears
-4. Realtime events from other clients merge into local state (dedup by id)
+1. On mount, `app/page.tsx` reads cookies (user, theme), fetches tasks + top_priorities from Supabase, subscribes to two Realtime channels (`tasks-realtime`, `priorities-realtime`)
+2. User input flows through handlers defined in `page.tsx` that do optimistic state updates + Supabase calls. Same pattern for tasks (toggle/title/owner/context/delete) and priorities (pin/unpin/reorder)
+3. On Supabase failure, state rolls back and an error toast appears
+4. Realtime events from other clients merge into local state (dedup by id for tasks, by slot for priorities)
+5. Completing a task fires the local `triggerComplete` chain in TaskRow: 600ms animation → onToggleDone(true) → toast.action("Task completed") with undo. The unpin-on-Done DB trigger frees the billboard slot if the completed task was pinned
 
 ---
 
@@ -177,15 +239,47 @@ User has a planned sequence of 13 prompts at `/Users/luishalvorssen/Library/Appl
 | 02 | `02-hover-and-touch-states.md` | ✅ shipped (commit `9b6a757`) |
 | 03 | `03-typography-hierarchy.md` | ✅ shipped (commit `daa36d5`) |
 | 04 | `04-card-contrast-and-spacing.md` | ✅ shipped (commit `e870fd2` + follow-up `eed28cb` making rows transparent on the card) |
-| 05 | `05-context-tag-colors.md` | ⏳ next |
-| 06 | `06-completion-animation.md` | pending (partial: swipe handler is in place via prompt 01) |
-| 07 | `07-enter-to-submit-and-input-polish.md` | pending |
-| 08 | `08-inline-edit-fix.md` | pending |
-| 09 | `09-delete-undo-toast.md` | pending |
+| 05 | `05-context-tag-colors.md` | ✅ shipped (commit `cbcd157`) |
+| 06 | `06-completion-animation.md` | ✅ shipped (commit `b2ab16e`) |
+| 07 | `07-enter-to-submit-and-input-polish.md` | ✅ shipped (commit `092dbcc`) |
+| 08 | `08-inline-edit-fix.md` | ⏳ next |
+| 09 | `09-delete-undo-toast.md` | pending (the "completed → undo" toast was built in prompt 06; deletion still needs its own undo path) |
 | 10 | `10-dark-mode-contrast.md` | pending |
 | 11 | `11-keyboard-shortcuts.md` | pending |
 | 12 | `12-command-palette.md` | pending |
 | 13 | `13-header-and-avatar-polish.md` | pending |
+
+## 9b. Top 3 Priorities (feature add — not from the prompt list)
+
+Shipped in commit `5f31f69` between prompts 04 and 05. A team-wide ranked
+billboard between the input bar and the task list. Always shows the same
+three pinned tasks regardless of owner / context / All-vs-Mine filters.
+
+- New `<TopPriorities>` component with a 2px Triptych-blue top accent on
+  an otherwise standard `--card-bg` surface. Three numbered slots
+  (`01 / 02 / 03`); empty slots render as dashed-border ghost rows so
+  the structure is always visible and the feature is discoverable.
+- Pin entry point: `☆ / ★` button in `<TaskRow>`'s actions group, paired
+  with the existing delete (×). Hidden until row hover on desktop;
+  always visible at 0.55 opacity on touch (mirrors the delete pattern).
+  When all 3 slots are full, the pin button on non-pinned rows is
+  disabled (`opacity: 0.35`, `cursor: default`); a toast.info("Top 3
+  full") fallback fires if anything bypasses the disabled state.
+- Pin behavior: fills lowest empty slot first (1 → 2 → 3). Newest pin
+  shows in the section header as "UPDATED <relative-time> BY <user>".
+- Reorder: HTML5 drag-and-drop within the billboard on desktop (no
+  library — three items, contained scope). Empty slots are valid drop
+  targets so a drag doubles as move-to-empty. On touch the reorder UX
+  is `▲ / ▼` chevrons gated by `@media (hover: none)`.
+- Auto-unpin on Done: handled by the `unpin_on_done()` Postgres trigger
+  on `tasks` (see §5). Means the billboard stays focused on active work
+  even when a pinned task is completed via swipe, undo toast, or a
+  direct SQL update.
+- Realtime sync via the `priorities-realtime` channel — pin / unpin /
+  reorder events propagate to all four clients within ~50ms.
+- All mutations flow through handlers in `app/page.tsx`:
+  `handleTogglePin`, `handleReorderPriorities`. Optimistic with rollback
+  on error, same pattern as task handlers.
 
 **Pattern for handling a new prompt:**
 1. Ask user to @-paste the prompt file
@@ -270,6 +364,11 @@ curl -s -X POST https://tasks.triptychmgmt.com/api/gate \
 Commit log so a future Claude can quickly see what shipped:
 
 ```
+092dbcc  Prompt 07: Form submission, focus accent, and input polish
+b2ab16e  Prompt 06: Task completion animation + undo toast
+cbcd157  Prompt 05: Color system for context tags
+5f31f69  Add Top 3 priorities billboard
+cb91e89  Update SESSION-CONTEXT for Prompts 02-04 shipped
 eed28cb  Fix: rows transparent on card surface
 e870fd2  Prompt 04: Card elevation, dividers, and row spacing
 daa36d5  Prompt 03: Typography hierarchy in task list
@@ -286,23 +385,47 @@ fe654ce  Initial commit: Triptych OS
 ### CSS tokens added by the UX pass
 
 These are referenced throughout `app/globals.css` and inline styles in
-`TaskRow.tsx` / `TaskList.tsx`. Both themes define them.
+`TaskRow.tsx` / `TaskList.tsx` / `TopPriorities.tsx`. Both themes define
+them.
 
 | Token | Light | Dark | Used for |
 |---|---|---|---|
 | `--task-title` | `#1A1A2E` | `#E8E8E8` | Task title text (Prompt 03) |
 | `--task-date` | `#999999` | `#777777` | Date metadata text (Prompt 03) |
-| `--card-bg` | `#FFFFFF` | `#111139` | Task list card surface (Prompt 04) |
+| `--card-bg` | `#FFFFFF` | `#111139` | Task list + billboard card surface (Prompt 04) |
 | `--row-divider` | `#EAEAEA` | `rgba(255,255,255,0.08)` | Row borders, tabs underline, header bottom (Prompt 04) |
 | `--card-shadow` | layered rgba | `0 1px 3px rgba(0,0,0,0.3)` | Card elevation desktop (Prompt 04) |
 | `--card-shadow-mobile` | `0 1px 2px rgba(0,0,0,0.04)` | `0 1px 2px rgba(0,0,0,0.2)` | Card elevation mobile (Prompt 04) |
+| `--swipe-complete` | `#22C55E` | `#22C55E` | Swipe-right completion bg with white checkmark (Prompt 06) |
 
-Hover/active feedback for rows lives in `globals.css` under
-`@media (hover: hover)` and `@media (hover: none)` blocks (Prompt 02).
-Do not move it back into React state — CSS owns it.
+### Tag color system (Prompt 05)
 
-Task rows use `background: transparent` so they inherit the card
-surface; the hover overlay paints rgba on top.
+`tagStyle()` in `lib/constants.ts` returns `{ color, bg }` based on the
+current `data-theme` attribute. Eleven hand-tuned light/dark pairs in
+the `TAG_COLORS` map cover MGMT (blues), Digital (orange), Internal
+(greens/teals + amber Fundraising). `tagShortName()` provides the
+mobile-friendly labels ("Internal: BD" → "BD"). Render as paired
+`<span class="tag-full">` / `<span class="tag-short">` and let CSS
+`@media (max-width: 639px)` swap visibility.
+
+### Animation conventions
+
+- Hover/active feedback for rows lives in `globals.css` under
+  `@media (hover: hover)` and `@media (hover: none)` blocks (Prompt 02).
+  Do not move it back into React state — CSS owns it.
+- Task rows use `background: transparent` so they inherit the card
+  surface; the hover overlay paints rgba on top.
+- Task completion animation (Prompt 06) is a 600ms three-stage CSS
+  sequence triggered by adding the `.completing` class to
+  `.task-row-swipe`. The state-flip-to-Done is deferred via setTimeout
+  so the animation runs to completion. Also see `tp-checkbox-pop`,
+  `tp-strike`, `tp-fadein` keyframes.
+- New-row enter animation (Prompt 07) is `tp-row-in` applied via
+  `.task-row-new`, gated by a module-level `PAGE_MOUNT_TIME` so only
+  tasks created in this session animate — history rows render statically.
+- Undo toast = `toast.action(message, { label, onClick })` — distinct
+  dark-pill variant in `Toaster.tsx`. Bottom-anchored with safe-area
+  awareness on mobile.
 
 ---
 
