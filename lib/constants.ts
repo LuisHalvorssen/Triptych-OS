@@ -1,4 +1,4 @@
-import type { ContextTag, Status, TeamMember } from "./types";
+import type { ContextTag, TeamMember } from "./types";
 
 export const TEAM: TeamMember[] = ["Jon", "Luis", "Aidan", "Liam"];
 
@@ -120,21 +120,6 @@ const SHORT_NAMES: Record<ContextTag, string> = {
 export function tagShortName(tag: ContextTag): string {
   return SHORT_NAMES[tag] ?? tag;
 }
-
-export interface StatusStyle {
-  color: string;
-  bg?: string;
-  border: string;
-}
-
-export const STATUS_CONFIG: Record<Status, StatusStyle> = {
-  Todo: { color: "#555555", border: "#2A2A2A" },
-  Done: {
-    color: "#3A8A5A",
-    bg: "rgba(58,138,90,0.08)",
-    border: "#3A8A5A",
-  },
-};
 
 export const USER_COOKIE = "triptych-user";
 export const USER_COOKIE_DAYS = 30;

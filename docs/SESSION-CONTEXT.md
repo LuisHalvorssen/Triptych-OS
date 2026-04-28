@@ -2,7 +2,7 @@
 
 **Read this first when starting a new Claude session on this project.** It captures everything a fresh agent needs to be productive in 5 minutes instead of re-exploring.
 
-Last updated: 2026-04-28
+Last updated: 2026-04-28 (Session close — Prompts 08-11 + cleanup)
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: 2026-04-28
 5. **Vercel project:** `luishalvorssens-projects/triptych-os` — auto-deploys on push to `main`
 6. **Before you edit anything:** read [README.md](../README.md), then this file, then skim [app/page.tsx](../app/page.tsx). Then read the section [§8 Hard rules](#8-hard-rules).
 
-If the user asks to pick up where we left off, the current work stream is **UI/UX improvements via a sequence of 13 `.md` prompts** (see [§9](#9-current-work-stream)). Prompts 01-07 are done; prompt 08 (inline edit fix) is next. The Top 3 Priorities billboard (a feature add, not a prompt) shipped between prompts 04 and 05 — see [§9b](#9b-top-3-priorities).
+If the user asks to pick up where we left off, the current work stream is **UI/UX improvements via a sequence of 13 `.md` prompts** (see [§9](#9-current-work-stream)). Prompts 01-11 are done; prompt 12 (command palette) is next. The Top 3 Priorities billboard (a feature add, not a prompt) shipped between prompts 04 and 05 — see [§9b](#9b-top-3-priorities). End-of-session ideas and tech-debt items live in [§14](#14-suggestions-for-future-work).
 
 ---
 
@@ -177,20 +177,41 @@ components/
                              plus an "action" variant (dark pill, embedded undo button).
 
 lib/
-  constants.ts               TEAM, TAGS, OWNER_COLORS, STATUS_CONFIG, tagStyle() (theme-
-                             aware, reads data-theme at render), tagShortName() for the
-                             mobile name swap, plus the per-tag light/dark color map.
+  constants.ts               TEAM, TAGS, OWNER_COLORS, DEFAULT_TAG, USER_COOKIE,
+                             USER_COOKIE_DAYS. tagStyle() is theme-aware (reads
+                             data-theme at render) and returns light/dark pairs from
+                             the per-tag TAG_COLORS map. tagShortName() provides the
+                             mobile-friendly labels.
   types.ts                   Task, Status, ContextTag, TeamMember, CategorizeResponse,
                              SlotNumber (1|2|3), TopPriority
-  supabase.ts                singleton client + missingSupabaseEnvVars[]
+  supabase.ts                singleton client + missingSupabaseEnvVars[]. Also
+                             syncDeleteTaskOnUnload(id) — fetch DELETE with
+                             keepalive: true used by the soft-delete beforeunload path.
   cookies.ts                 triptych-user cookie read/write
   theme.ts                   triptych-theme cookie read/write + applyTheme()
   toast.ts                   module-level toast store + useToasts() hook. Variants:
                              error / success / info / action (with {label, onClick}).
   gate.ts                    SHA-256 gate-token helpers (used by middleware + /api/gate)
   useSwipe.ts                touch-only left/right swipe gesture hook (threshold 100px,
-                             aborts on >30px Y drift to preserve native scroll)
+                             aborts on >30px Y drift to preserve native scroll). Used
+                             by TaskRow for swipe-right-complete + swipe-left-delete.
 ```
+
+### Page-level state (app/page.tsx)
+
+The page is the single owner of all server-derived state. Children receive props
+and event handlers — they never call Supabase directly.
+
+- `currentUser`, `theme`, `hydrated` — UI state for first-paint
+- `tasks: Task[]` — canonical task list, mutated by optimistic handlers + realtime
+- `priorities: TopPriority[]` — slot→task_id mapping for the billboard
+- `pendingDeletes: Map<string, Task>` — soft-deleted tasks held during the 4s undo
+  window. Tasks here are filtered out of `visibleTasks`
+- `recentlyDeletingIds: Set<string>` — tasks in the 200ms exit animation before
+  they're moved into `pendingDeletes`
+- `deleteCommitTimersRef` (Map), `deleteToastIdRef` (string|null) — bookkeeping
+  for the soft-delete pipeline (kept in refs so they survive renders without
+  causing them)
 
 **Data flow:**
 1. On mount, `app/page.tsx` reads cookies (user, theme), fetches tasks + top_priorities from Supabase, subscribes to two Realtime channels (`tasks-realtime`, `priorities-realtime`)
@@ -242,12 +263,17 @@ User has a planned sequence of 13 prompts at `/Users/luishalvorssen/Library/Appl
 | 05 | `05-context-tag-colors.md` | ✅ shipped (commit `cbcd157`) |
 | 06 | `06-completion-animation.md` | ✅ shipped (commit `b2ab16e`) |
 | 07 | `07-enter-to-submit-and-input-polish.md` | ✅ shipped (commit `092dbcc`) |
-| 08 | `08-inline-edit-fix.md` | ⏳ next |
-| 09 | `09-delete-undo-toast.md` | pending (the "completed → undo" toast was built in prompt 06; deletion still needs its own undo path) |
-| 10 | `10-dark-mode-contrast.md` | pending |
-| 11 | `11-keyboard-shortcuts.md` | pending |
-| 12 | `12-command-palette.md` | pending |
-| 13 | `13-header-and-avatar-polish.md` | pending |
+| 08 | `08-inline-edit-fix.md` | ✅ shipped (commit `bb44909`) |
+| 09 | `09-delete-undo-toast.md` | ✅ shipped (commit `f6d8b48`) |
+| 10 | `10-dark-mode-contrast.md` | ✅ shipped (commit `95dd507`) |
+| 11 | `11-header-and-avatar-polish.md` | ✅ shipped (commit `64102a8`) |
+| 12 | `12-command-palette.md` | ⏳ next |
+| 13 | `13-keyboard-shortcuts.md` | pending |
+
+> **Note on prompt numbering:** the original spec listed prompt 11 as "keyboard
+> shortcuts" and prompt 13 as "header and avatar polish". The user pulled the
+> header polish forward to slot 11, so the remaining prompts are 12 (command
+> palette) and 13 (keyboard shortcuts).
 
 ## 9b. Top 3 Priorities (feature add — not from the prompt list)
 
@@ -364,6 +390,12 @@ curl -s -X POST https://tasks.triptychmgmt.com/api/gate \
 Commit log so a future Claude can quickly see what shipped:
 
 ```
+973c1a1  Fix: checkbox vertically centered with the rest of the row
+64102a8  Prompt 11: Header bar + avatar polish
+95dd507  Prompt 10: Dark-mode contrast pass
+f6d8b48  Prompt 09: Soft-delete with 4s undo window
+bb44909  Prompt 08: Inline edit truncation fix + edit-mode polish
+3bca50f  Update SESSION-CONTEXT through Prompt 07 + Top 3 Priorities
 092dbcc  Prompt 07: Form submission, focus accent, and input polish
 b2ab16e  Prompt 06: Task completion animation + undo toast
 cbcd157  Prompt 05: Color system for context tags
@@ -384,19 +416,30 @@ fe654ce  Initial commit: Triptych OS
 
 ### CSS tokens added by the UX pass
 
-These are referenced throughout `app/globals.css` and inline styles in
-`TaskRow.tsx` / `TaskList.tsx` / `TopPriorities.tsx`. Both themes define
-them.
+Both themes define every token; tokens listed in `:root, html[data-theme="dark"]`
+are the dark values, light values come from the `html[data-theme="light"]`
+override.
 
 | Token | Light | Dark | Used for |
 |---|---|---|---|
+| `--bg`, `--surface`, `--surface-hover` | warm-ash palette | navy | Page bg, card surface, hover state |
+| `--border`, `--border-strong` | `#C8C4D8` / `#B0AAC5` | `#252555` / `#4A4A85` | Subtle borders, active borders |
+| `--divider`, `--row-divider` | `#D8D5E3` / `#EAEAEA` | `#1A1A42` / `rgba(255,255,255,0.08)` | Input bar bottom (`--divider`), in-card row separators (`--row-divider`) |
+| `--text-primary` | `#1A1A2E` | `#DDD8D0` | General body text |
+| `--text-secondary` | `#5A5A7A` | `#7A7A9A` | (rarely used; theme toggle) |
+| `--text-muted` | `#8A86A0` | `#B0B0B0` | Inactive states, "ALL CONTEXTS", "OPEN" label |
+| `--text-subtle` | `#A8A4B8` | `#707070` | Empty states, helper text |
+| `--placeholder` | `#A8A4B8` | `#777777` | Input placeholders (Prompt 10) |
+| `--accent-blue`, `--accent-red` | `#2C3BD3` / `#CC3333` | same | Triptych brand + destructive |
 | `--task-title` | `#1A1A2E` | `#E8E8E8` | Task title text (Prompt 03) |
-| `--task-date` | `#999999` | `#777777` | Date metadata text (Prompt 03) |
+| `--task-date` | `#999999` | `#888888` | Date metadata text (Prompts 03, 10) |
 | `--card-bg` | `#FFFFFF` | `#111139` | Task list + billboard card surface (Prompt 04) |
-| `--row-divider` | `#EAEAEA` | `rgba(255,255,255,0.08)` | Row borders, tabs underline, header bottom (Prompt 04) |
 | `--card-shadow` | layered rgba | `0 1px 3px rgba(0,0,0,0.3)` | Card elevation desktop (Prompt 04) |
 | `--card-shadow-mobile` | `0 1px 2px rgba(0,0,0,0.04)` | `0 1px 2px rgba(0,0,0,0.2)` | Card elevation mobile (Prompt 04) |
-| `--swipe-complete` | `#22C55E` | `#22C55E` | Swipe-right completion bg with white checkmark (Prompt 06) |
+
+The completion swipe bg is hardcoded `#22C55E` directly in
+`.task-row-swipe[data-swipe-direction="right"]`; left/delete swipe is `#EF4444`
+in the matching rule. Not tokenized because each is used in exactly one rule.
 
 ### Tag color system (Prompt 05)
 
@@ -426,6 +469,99 @@ mobile-friendly labels ("Internal: BD" → "BD"). Render as paired
 - Undo toast = `toast.action(message, { label, onClick })` — distinct
   dark-pill variant in `Toaster.tsx`. Bottom-anchored with safe-area
   awareness on mobile.
+- Soft-delete exit animation (Prompt 09) is `.deleting.task-row-swipe`
+  — opacity 0 + translateX(20px) over 200ms. State machine in
+  `app/page.tsx` keeps the task in `tasks` for 200ms (`recentlyDeletingIds`)
+  then moves it into `pendingDeletes` (filtered out of `visibleTasks`)
+  for 4 seconds before the real DB DELETE fires.
+- Header scroll shadow (Prompt 11) — passive scroll listener in
+  `Header.tsx` toggles `.app-header-scrolled`, which only paints a
+  shadow on mobile via the `@media (max-width: 639px)` rule.
+- Inline edit indicator (Prompt 08) — `.task-title-input` gets a warm
+  fill (`#FFF9E6` light / `rgba(232,83,14,0.08)` dark) and a soft
+  orange border. Mobile renders a `.task-title-cancel` × button via
+  `@media (hover: none)` so touch users have a way out.
+
+---
+
+## 14. Suggestions for future work
+
+End-of-session punch list. Roughly ordered by impact / effort.
+
+### High value, low effort
+
+1. **Migrate to Supabase Auth + RLS.** Today the gate password is the only
+   thing protecting reads/writes (RLS is permissive, anon key is shipped
+   to clients by design). Real auth would mean per-user permissions,
+   audit trails, and the ability to expose a public read view if you ever
+   want one. Estimated 2-3 hours.
+2. **Rotate the Anthropic API key** (was leaked in chat earlier in the
+   project's life). Console at https://console.anthropic.com/settings/keys.
+   Update `.env.local` + `vercel env rm/add ANTHROPIC_API_KEY production`
+   then redeploy.
+3. **Re-point `onboarding.triptychmgmt.com`.** Sister project's prod URL
+   is still down from the 2026-04-24 Vercel migration.
+4. **Validate `/api/categorize` response shape.** `app/page.tsx`
+   currently `as`-casts the JSON to `CategorizeResponse`. A `zod` parse
+   (or hand-written check) would prevent silent regressions if the API
+   contract drifts.
+
+### Refactors worth doing eventually
+
+5. **Consolidate `OwnerDotSelect` + `TagPillSelect`** in `TaskRow.tsx`
+   — same overlay-`<select>` pattern, ~60 lines duplicated. A shared
+   `<DropdownPill>` would cut LOC and make the pattern reusable for
+   future filters.
+6. **Inline-styles → Tailwind / CSS Modules.** Most components still
+   use inline-style objects. Works, but defeats Tailwind's tree-shaking
+   and makes hover/active/focus state plumbing awkward (we already
+   migrated the input bar in Prompt 07; the rest could follow).
+7. **Slim the Supabase client bundle.** `@supabase/supabase-js` ships
+   auth + storage + realtime even though we only use realtime +
+   PostgREST. Manual REST + a thin realtime client would cut bundle
+   meaningfully if perf becomes a concern.
+8. **Move pending-delete state into a custom hook.** `app/page.tsx`
+   has grown to ~500 lines, half of which is the soft-delete state
+   machine. A `useSoftDelete()` hook returning `{ visibleTasks,
+   handleDelete, recentlyDeletingIds }` would tighten the page.
+
+### Polish ideas
+
+9. **Avatar long-press tooltip on mobile.** Prompt 11 left this as
+   optional; the `title` attribute won't fire on touch. A 200ms-hold
+   handler showing a small bubble would let mobile users discover names.
+10. **Animate the row sliding back in on delete-undo.** Currently the
+    row reappears at full opacity instantly when the user taps Undo.
+    A reverse of the deleting animation would feel more polished.
+11. **Empty-billboard nudge.** When `priorities.length === 0`, the dashed
+    slots look correct but a small caption ("Pin three tasks the team is
+    focused on this week") would help first-time users.
+12. **Preserve scroll on theme toggle.** Switching theme on a long list
+    can shift things. Worth a `requestAnimationFrame` test if the user
+    flags it.
+
+### Things that would be net-negative right now
+
+- **Fancy DnD library for the billboard.** HTML5 DnD works fine for the
+  three-slot scope; importing `dnd-kit` would add bundle weight without
+  helping. Stay vanilla.
+- **Per-route layouts / multiple pages.** The single-page model is
+  intentional. The Sacred Flow (log on → pick owner → type → enter →
+  see it) breaks the moment you split into routes.
+
+---
+
+## 15. Pre-session-close cleanup (2026-04-28)
+
+Quick audit before closing the session — small wins:
+
+- Removed `STATUS_CONFIG` + `StatusStyle` from `lib/constants.ts`. Dead
+  since the In-Progress / Waiting-On statuses were dropped pre-prompt-01.
+- Removed three unused CSS custom properties from both theme blocks in
+  `globals.css`: `--surface-2`, `--accent-gold`, `--swipe-complete`.
+  Verified zero usages via `grep -r "var(--name)"`.
+- Auditor flagged `OwnerDotSelect`/`TagPillSelect` consolidation; deferred
+  to "Refactors worth doing eventually" (item 5 above).
 
 ---
 

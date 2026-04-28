@@ -6,7 +6,6 @@
 html[data-theme="dark"] {
   --bg: #0A0A2E;
   --surface: #111139;
-  --surface-2: #15153E;
   --surface-hover: #2A2A55;       /* Prompt 10: brighter for FilterPill active state */
   --border: #252555;
   --border-strong: #4A4A85;       /* Prompt 10: brighter active-border in dark */
@@ -14,9 +13,8 @@ html[data-theme="dark"] {
   --text-secondary: #7A7A9A;
   --text-muted: #B0B0B0;          /* Prompt 10: was #444470 — fixes invisible "ALL CONTEXTS", "OPEN" label, etc. */
   --text-subtle: #707070;         /* Prompt 10: was #2E2E52 — empty states, helper text */
-  --divider: #1A1A42;
+  --divider: #1A1A42;             /* used only for the input bar bottom; rows use --row-divider */
   --accent-blue: #2C3BD3;
-  --accent-gold: #CC9933;
   --accent-red: #CC3333;
   --placeholder: #777777;         /* Prompt 10: was #3A3A62 */
 
@@ -27,14 +25,11 @@ html[data-theme="dark"] {
   --row-divider: rgba(255, 255, 255, 0.08);
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   --card-shadow-mobile: 0 1px 2px rgba(0, 0, 0, 0.2);
-
-  --swipe-complete: #22C55E;
 }
 
 html[data-theme="light"] {
   --bg: #EEEDF5;
   --surface: #E4E2EE;
-  --surface-2: #DAD7E6;
   --surface-hover: #CFCBE0;
   --border: #C8C4D8;
   --border-strong: #B0AAC5;
@@ -44,7 +39,6 @@ html[data-theme="light"] {
   --text-subtle: #A8A4B8;
   --divider: #D8D5E3;
   --accent-blue: #2C3BD3;
-  --accent-gold: #B08020;
   --accent-red: #CC3333;
   --placeholder: #A8A4B8;
 
@@ -55,8 +49,6 @@ html[data-theme="light"] {
   --row-divider: #EAEAEA;
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --card-shadow-mobile: 0 1px 2px rgba(0, 0, 0, 0.04);
-
-  --swipe-complete: #22C55E;
 }
 
 * { box-sizing: border-box; }
