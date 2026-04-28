@@ -202,7 +202,7 @@ export function TaskList({
           >
             <span
               style={{
-                color: "var(--text-primary)",
+                color: "var(--task-title)",
                 fontWeight: 600,
                 fontSize: "1.125rem",
               }}

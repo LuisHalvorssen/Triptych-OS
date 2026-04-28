@@ -7,21 +7,21 @@ html[data-theme="dark"] {
   --bg: #0A0A2E;
   --surface: #111139;
   --surface-2: #15153E;
-  --surface-hover: #1A1A45;
+  --surface-hover: #2A2A55;       /* Prompt 10: brighter for FilterPill active state */
   --border: #252555;
-  --border-strong: #303065;
+  --border-strong: #4A4A85;       /* Prompt 10: brighter active-border in dark */
   --text-primary: #DDD8D0;
   --text-secondary: #7A7A9A;
-  --text-muted: #444470;
-  --text-subtle: #2E2E52;
+  --text-muted: #B0B0B0;          /* Prompt 10: was #444470 — fixes invisible "ALL CONTEXTS", "OPEN" label, etc. */
+  --text-subtle: #707070;         /* Prompt 10: was #2E2E52 — empty states, helper text */
   --divider: #1A1A42;
   --accent-blue: #2C3BD3;
   --accent-gold: #CC9933;
   --accent-red: #CC3333;
-  --placeholder: #3A3A62;
+  --placeholder: #777777;         /* Prompt 10: was #3A3A62 */
 
   --task-title: #E8E8E8;
-  --task-date: #777777;
+  --task-date: #888888;           /* Prompt 10: was #777777 */
 
   --card-bg: #111139;
   --row-divider: rgba(255, 255, 255, 0.08);
@@ -308,6 +308,18 @@ select option { background: var(--surface); color: var(--text-primary); }
   .task-input-submit:not(:disabled):hover { background: #2330B8; border-color: #2330B8; }
 }
 .task-input-submit:not(:disabled):active { transform: scale(0.97); }
+
+/* Prompt 10: input + select + disabled-add-button get a clearly visible
+   border in dark mode so they don't blend into the page background. */
+html[data-theme="dark"] .task-input-field,
+html[data-theme="dark"] .task-input-select,
+html[data-theme="dark"] .task-input-submit:disabled {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+html[data-theme="dark"] .task-input-select:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+/* :focus on the field already paints orange via the rule above; preserve. */
 
 /* Submit button: text label on desktop, "+" icon on mobile. */
 .task-input-submit-icon { display: none; }
