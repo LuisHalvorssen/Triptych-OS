@@ -443,7 +443,7 @@ export function TaskRow({
         className="task-row task-row-inner"
         style={{
           display: "flex",
-          alignItems: "flex-start",
+          alignItems: "center",
           flexWrap: "wrap",
           columnGap: 10,
           rowGap: 6,
@@ -467,7 +467,6 @@ export function TaskRow({
           className="task-checkbox"
           style={{
             flexShrink: 0,
-            marginTop: -2,
             border: "none",
             background: "transparent",
             cursor: "pointer",
@@ -500,7 +499,7 @@ export function TaskRow({
           </span>
         </button>
 
-        <div className="task-owner-wrap" style={{ marginTop: 1, flexShrink: 0 }}>
+        <div className="task-owner-wrap" style={{ flexShrink: 0 }}>
           <OwnerDotSelect
             owner={task.owner}
             onChange={(next) => onUpdateOwner(task.id, next)}
@@ -522,7 +521,6 @@ export function TaskRow({
             alignItems: "center",
             gap: 8,
             flexShrink: 0,
-            marginTop: 2,
           }}
         >
           <span
