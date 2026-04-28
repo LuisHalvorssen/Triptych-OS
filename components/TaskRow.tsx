@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { OWNER_COLORS, TAGS, TEAM, tagStyle } from "@/lib/constants";
+import { OWNER_COLORS, TAGS, TEAM, tagShortName, tagStyle } from "@/lib/constants";
 import { useSwipe } from "@/lib/useSwipe";
 import type { ContextTag, Task, TeamMember } from "@/lib/types";
 
@@ -121,13 +121,14 @@ function TagPillSelect({
           fontFamily: "'Syne', sans-serif",
           color,
           background: bg,
-          padding: "2px 7px",
-          borderRadius: 2,
+          padding: "2px 8px",
+          borderRadius: 4,
           whiteSpace: "nowrap",
           pointerEvents: "none",
         }}
       >
-        {tag}
+        <span className="tag-full">{tag}</span>
+        <span className="tag-short">{tagShortName(tag)}</span>
       </span>
       {!disabled && (
         <select

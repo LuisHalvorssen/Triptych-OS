@@ -303,9 +303,18 @@ select option { background: var(--surface); color: var(--text-primary); }
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 2px;
+  padding: 2px 8px;
+  border-radius: 4px;
   white-space: nowrap;
+}
+
+/* Mobile-friendly tag labels: swap full -> short under 640px so prefixes
+   don't push tags onto a second line. The color carries the category. */
+.task-tag-pill .tag-full { display: inline; }
+.task-tag-pill .tag-short { display: none; }
+@media (max-width: 639px) {
+  .task-tag-pill .tag-full { display: none; }
+  .task-tag-pill .tag-short { display: inline; }
 }
 .priority-unpin {
   background: none;

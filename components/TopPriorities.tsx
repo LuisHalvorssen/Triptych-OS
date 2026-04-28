@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { OWNER_COLORS, tagStyle } from "@/lib/constants";
+import { OWNER_COLORS, tagShortName, tagStyle } from "@/lib/constants";
 import type { SlotNumber, Task } from "@/lib/types";
 
 export interface PrioritySlot {
@@ -143,7 +143,8 @@ function PriorityTag({ tag }: { tag: Task["context"] }) {
       className="priority-tag-pill task-tag-pill"
       style={{ color, background: bg }}
     >
-      {tag}
+      <span className="tag-full">{tag}</span>
+      <span className="tag-short">{tagShortName(tag)}</span>
     </span>
   );
 }
