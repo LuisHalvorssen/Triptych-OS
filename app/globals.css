@@ -309,6 +309,59 @@ select option { background: var(--surface); color: var(--text-primary); }
   .task-input-submit-icon { display: inline !important; }
 }
 
+/* =========================================================================
+   Inline edit mode for task titles (Prompt 08).
+   Subtle warm fill + soft orange border so users can see they're editing
+   without it feeling like an "error" or modal state.
+   ========================================================================= */
+.task-title-edit-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 6px;
+}
+.task-title-input {
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9375rem; /* 15px desktop; mobile rule bumps to 16px */
+  font-weight: 500;
+  color: var(--task-title);
+  background: #FFF9E6;
+  border: 1px solid rgba(232, 83, 14, 0.2);
+  border-radius: 4px;
+  padding: 6px 10px;
+  outline: none;
+  letter-spacing: -0.01em;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.task-title-input:focus {
+  border-color: rgba(232, 83, 14, 0.5);
+}
+html[data-theme="dark"] .task-title-input {
+  background: rgba(232, 83, 14, 0.08);
+}
+
+/* Cancel button only visible on touch — desktop has Escape. */
+.task-title-cancel {
+  display: none;
+  background: none;
+  border: 1px solid var(--row-divider);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 10px;
+  flex-shrink: 0;
+  transition: color 0.12s, border-color 0.12s;
+}
+@media (hover: none) {
+  .task-title-cancel { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
+}
+
 /* New row enter animation — applied to .task-row-new on first mount. */
 @keyframes tp-row-in {
   from { opacity: 0; transform: translateY(-8px); }
@@ -568,7 +621,8 @@ select option { background: var(--surface); color: var(--text-primary); }
   transition: opacity 150ms ease;
 }
 .task-row .task-delete,
-.task-row .task-pin {
+.task-row .task-pin,
+.task-row .task-edit {
   transition: color 0.12s;
   color: var(--text-muted);
 }
@@ -601,7 +655,11 @@ select option { background: var(--surface); color: var(--text-primary); }
     text-overflow: ellipsis !important;
     font-size: 0.875rem !important; /* 14px floor on mobile */
   }
-  .task-row .task-title-input { font-size: 1rem !important; /* 16px prevents iOS zoom */ }
+  .task-row .task-title-input {
+    font-size: 1rem !important; /* 16px prevents iOS zoom */
+    min-height: 44px !important;
+    padding: 10px 12px !important;
+  }
   .task-row .task-meta {
     margin-left: 36px;
     order: 2;
@@ -643,6 +701,7 @@ select option { background: var(--surface); color: var(--text-primary); }
   .task-row:hover .task-actions { opacity: 1; }
   .task-row .task-delete:hover { color: var(--accent-red) !important; }
   .task-row .task-pin:hover { color: var(--accent-blue) !important; }
+  .task-row .task-edit:hover { color: #E8530E !important; }
 
   .task-row .task-checkbox:hover .task-checkbox-visual {
     border-color: #E8530E !important;

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { OWNER_COLORS, TAGS, TEAM, tagShortName, tagStyle } from "@/lib/constants";
 import { toast } from "@/lib/toast";
 import { useSwipe } from "@/lib/useSwipe";
@@ -167,73 +174,134 @@ function TagPillSelect({
   );
 }
 
-function EditableTitle({
-  value,
-  onCommit,
-  muted,
-}: {
-  value: string;
-  onCommit: (next: string) => void;
-  muted: boolean;
-}) {
+interface EditableTitleHandle {
+  enterEdit: () => void;
+}
+
+const EditableTitle = forwardRef<
+  EditableTitleHandle,
+  {
+    value: string;
+    onCommit: (next: string) => void;
+    muted: boolean;
+  }
+>(function EditableTitle({ value, onCommit, muted }, ref) {
   const [editing, setEditing] = useState(false);
-  // Draft is seeded from `value` at the moment edit mode is entered
-  // (via the `key` remount), so we never need to sync it via an effect.
+  // Draft is seeded from `value` when edit mode opens (via setDraft in
+  // the entry handlers), so we never need to sync it via an effect.
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleBtnRef = useRef<HTMLButtonElement>(null);
+  // Set when the user is intentionally cancelling so the blur that
+  // follows doesn't fire commit() with the original value.
+  const cancellingRef = useRef(false);
+  // Tracks the last known editing state so we can restore focus to
+  // the row's title button after exit.
+  const wasEditingRef = useRef(false);
+
+  const enterEdit = useCallback(() => {
+    setDraft(value);
+    setEditing(true);
+  }, [value]);
+
+  useImperativeHandle(ref, () => ({ enterEdit }), [enterEdit]);
 
   useEffect(() => {
     if (editing) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+      const input = inputRef.current;
+      if (input) {
+        input.focus();
+        // Caret at the start so long titles aren't visually clipped
+        // from the left. Then select-all so type-to-replace works as
+        // people expect; the visible scroll position remains at 0.
+        input.setSelectionRange(0, input.value.length);
+        input.scrollLeft = 0;
+        if (
+          typeof window !== "undefined" &&
+          window.matchMedia("(max-width: 639px)").matches
+        ) {
+          // Wait one tick for the keyboard to start opening, then
+          // pull the row into the safe area above the keyboard.
+          setTimeout(() => {
+            input.scrollIntoView({ block: "center", behavior: "smooth" });
+          }, 120);
+        }
+      }
+      wasEditingRef.current = true;
+    } else if (wasEditingRef.current) {
+      wasEditingRef.current = false;
+      titleBtnRef.current?.focus();
     }
   }, [editing]);
 
   function commit() {
+    if (cancellingRef.current) {
+      cancellingRef.current = false;
+      return;
+    }
     const trimmed = draft.trim();
     setEditing(false);
     if (trimmed && trimmed !== value) onCommit(trimmed);
   }
 
+  function cancel() {
+    cancellingRef.current = true;
+    setDraft(value);
+    setEditing(false);
+  }
+
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        className="task-title-input"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          else if (e.key === "Escape") {
-            setDraft(value);
-            setEditing(false);
-          }
-        }}
-        style={{
-          flex: 1,
-          minWidth: 0,
-          fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: "0.9375rem", // 15px
-          fontWeight: 500,
-          color: "var(--task-title)",
-          background: "var(--surface)",
-          border: "1px solid var(--accent-blue)",
-          borderRadius: 2,
-          padding: "4px 8px",
-          outline: "none",
-          letterSpacing: "-0.01em",
-        }}
-      />
+      <span className="task-title-edit-wrap">
+        <input
+          ref={inputRef}
+          className="task-title-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              cancel();
+            }
+          }}
+          enterKeyHint="done"
+        />
+        <button
+          type="button"
+          className="task-title-cancel"
+          // preventDefault on mousedown stops the input's blur from
+          // firing commit() before our cancel logic runs.
+          onMouseDown={(e) => e.preventDefault()}
+          onTouchStart={(e) => e.preventDefault()}
+          onClick={cancel}
+          aria-label="Cancel edit"
+          title="Cancel"
+        >
+          ×
+        </button>
+      </span>
     );
   }
 
   return (
     <button
+      ref={titleBtnRef}
       className="task-title-btn"
       onClick={() => {
-        setDraft(value);
-        setEditing(true);
+        // On touch, single-tap on the title is just :active feedback —
+        // don't open the editor. Editing on mobile happens via the
+        // pencil button in the row actions group.
+        if (
+          typeof window !== "undefined" &&
+          window.matchMedia("(hover: none)").matches
+        ) {
+          return;
+        }
+        enterEdit();
       }}
       title="Click to edit"
       style={{
@@ -259,7 +327,7 @@ function EditableTitle({
       {value}
     </button>
   );
-}
+});
 
 export function TaskRow({
   task,
@@ -313,6 +381,7 @@ export function TaskRow({
 
   const isFreshlyCreated =
     Date.parse(task.created_at) > PAGE_MOUNT_TIME;
+  const editableRef = useRef<{ enterEdit: () => void } | null>(null);
 
   return (
     <div
@@ -411,6 +480,7 @@ export function TaskRow({
         </div>
 
         <EditableTitle
+          ref={editableRef}
           value={task.title}
           onCommit={(next) => onUpdateTitle(task.id, next)}
           muted={isDone}
@@ -475,6 +545,23 @@ export function TaskRow({
             }}
           >
             {isPinned ? "★" : "☆"}
+          </button>
+          <button
+            className="task-edit tap-target"
+            onClick={() => editableRef.current?.enterEdit()}
+            aria-label="Edit task title"
+            title="Edit"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 13,
+              lineHeight: 1,
+              padding: "0 4px",
+              flexShrink: 0,
+            }}
+          >
+            ✎
           </button>
           <button
             className="task-delete tap-target"
