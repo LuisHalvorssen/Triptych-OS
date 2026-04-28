@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { OWNER_COLORS, TEAM } from "@/lib/constants";
 import type { Theme } from "@/lib/theme";
 import type { TeamMember } from "@/lib/types";
@@ -17,46 +18,33 @@ export function Header({
   theme,
   onToggleTheme,
 }: Props) {
+  // Drives the .app-header-scrolled bottom shadow on mobile when the
+  // page has scrolled past the header. Cheap passive listener.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 0);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
     <header
-      className="app-header"
+      className={`app-header${scrolled ? " app-header-scrolled" : ""}`}
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
       }}
     >
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span
-          className="app-header-brand"
-          style={{
-            fontSize: 10,
-            fontWeight: 800,
-            letterSpacing: "0.22em",
-            color: "var(--accent-blue)",
-            fontFamily: "'Syne', sans-serif",
-          }}
-        >
-          TRIPTYCH
-        </span>
-        <span
-          className="app-header-brand-os"
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.22em",
-            color: "var(--text-subtle)",
-            fontFamily: "'Syne', sans-serif",
-          }}
-        >
-          OS
-        </span>
+      <div className="app-header-brand-wrap">
+        <span className="app-header-brand">TRIPTYCH</span>
+        <span className="app-header-brand-os">OS</span>
       </div>
 
-      <div
-        className="app-header-avatars"
-        style={{ display: "flex", alignItems: "center", gap: 8 }}
-      >
+      <div className="app-header-avatars">
         {TEAM.map((m) => {
           const active = currentUser === m;
           const color = OWNER_COLORS[m];
@@ -64,39 +52,25 @@ export function Header({
             <button
               key={m}
               onClick={() => onSwitchUser(m)}
-              title={`View as ${m}`}
+              title={m}
               aria-label={`View as ${m}`}
-              className="app-header-avatar"
-              style={{
-                width: 26,
-                height: 26,
-                borderRadius: "50%",
-                background: active ? color : "var(--surface)",
-                border: `1.5px solid ${active ? color : "var(--border)"}`,
-                color: active ? "#fff" : "var(--text-muted)",
-                fontSize: 9,
-                fontWeight: 800,
-                cursor: "pointer",
-                fontFamily: "'Syne', sans-serif",
-                transition: "all 0.15s",
-                padding: 0,
-              }}
+              className={`app-header-avatar${active ? " is-active" : ""}`}
+              style={{ ["--owner-color" as string]: color }}
             >
-              {m[0]}
+              <span
+                className="app-header-avatar-circle"
+                style={{
+                  background: active ? color : "var(--surface)",
+                  color: active ? "#fff" : "var(--text-muted)",
+                }}
+                aria-hidden="true"
+              >
+                {m[0]}
+              </span>
             </button>
           );
         })}
-        <span
-          className="app-header-current"
-          style={{
-            fontSize: 9,
-            color: "var(--text-subtle)",
-            letterSpacing: "0.1em",
-            marginLeft: 2,
-            marginRight: 8,
-            fontFamily: "'Syne', sans-serif",
-          }}
-        >
+        <span className="app-header-current">
           {currentUser.toUpperCase()}
         </span>
 
@@ -105,22 +79,6 @@ export function Header({
           title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           aria-label="Toggle theme"
           className="app-header-toggle"
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: "var(--surface)",
-            border: "1.5px solid var(--border)",
-            color: "var(--text-secondary)",
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 11,
-            lineHeight: 1,
-            transition: "all 0.15s",
-            padding: 0,
-          }}
         >
           {theme === "dark" ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
