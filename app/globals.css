@@ -209,19 +209,112 @@ select option { background: var(--surface); color: var(--text-primary); }
 }
 
 /* =========================================================================
-   Task input — hide helper text on mobile, stretch select + button.
+   Task input — assignee select, text field, ADD button.
+   Hover/pressed states scoped to (hover: hover) where they help.
    ========================================================================= */
-/* Submit button: text label on desktop, arrow icon on mobile. */
+.task-input-select-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+.task-input-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 13px 26px 13px 14px;
+  font-size: 12px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 72px;
+  min-height: 44px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.task-input-select-chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Syne', sans-serif;
+}
+@media (hover: hover) {
+  .task-input-select:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+}
+
+.task-input-field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-primary);
+  padding: 13px 44px 13px 16px;
+  font-size: 13px;
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  letter-spacing: -0.01em;
+  min-height: 44px;
+}
+.task-input-field:focus {
+  border-color: #E8530E;
+  box-shadow: inset 0 -2px 0 0 #E8530E;
+}
+
+.task-input-submit {
+  background: var(--accent-blue);
+  border: 1px solid var(--accent-blue);
+  color: #ffffff;
+  padding: 13px 22px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  flex-shrink: 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 150ms ease, transform 100ms ease, opacity 150ms ease;
+}
+.task-input-submit:disabled {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-subtle);
+  cursor: not-allowed;
+}
+@media (hover: hover) {
+  .task-input-submit:not(:disabled):hover { background: #2330B8; border-color: #2330B8; }
+}
+.task-input-submit:not(:disabled):active { transform: scale(0.97); }
+
+/* Submit button: text label on desktop, "+" icon on mobile. */
 .task-input-submit-icon { display: none; }
 @media (max-width: 639px) {
   .task-input-outer { padding: 20px 16px 16px !important; }
   .task-input-helper { display: none !important; }
-  .task-input-select { min-width: 54px !important; padding: 10px 12px !important; font-size: 13px !important; }
+  .task-input-select { min-width: 54px !important; padding: 10px 24px 10px 12px !important; font-size: 13px !important; }
   .task-input-field { font-size: 16px !important; /* prevent iOS zoom */ padding: 13px 16px !important; }
   .task-input-submit { padding: 13px 16px !important; min-width: 54px; }
   .task-input-submit-label { display: none !important; }
   .task-input-submit-icon { display: inline !important; }
 }
+
+/* New row enter animation — applied to .task-row-new on first mount. */
+@keyframes tp-row-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.task-row-new { animation: tp-row-in 200ms ease-out both; }
 
 /* =========================================================================
    Filter bar — stacks into two rows on mobile.

@@ -11,6 +11,13 @@ import type { ContextTag, Task, TeamMember } from "@/lib/types";
 // before the underlying state flips it into Closed.
 const COMPLETE_ANIMATION_MS = 600;
 
+// Captured at module load so we can flag rows that arrive after the
+// page mounted (i.e. were just created in this session) for the
+// fade-down enter animation. Tasks loaded from history don't trip
+// this since their created_at predates the mount.
+const PAGE_MOUNT_TIME =
+  typeof window === "undefined" ? 0 : Date.now();
+
 interface Props {
   task: Task;
   isPinned: boolean;
@@ -304,9 +311,12 @@ export function TaskRow({
   const dx = isDone ? 0 : Math.max(0, Math.min(swipe.state.dx, 120));
   const showSwipeBg = dx > 0;
 
+  const isFreshlyCreated =
+    Date.parse(task.created_at) > PAGE_MOUNT_TIME;
+
   return (
     <div
-      className={`task-row-swipe${completing ? " completing" : ""}`}
+      className={`task-row-swipe${completing ? " completing" : ""}${isFreshlyCreated ? " task-row-new" : ""}`}
       data-swipe-active={showSwipeBg ? "true" : "false"}
       {...swipe.handlers}
       style={{
