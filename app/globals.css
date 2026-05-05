@@ -198,11 +198,48 @@ select option { background: var(--surface); color: var(--text-primary); }
   z-index: 50;
   background: var(--bg);
   border-bottom: 1px solid var(--row-divider);
-  padding: 18px 32px;
+  padding: 18px 32px 0;
   padding-top: calc(18px + env(safe-area-inset-top));
   padding-left: calc(32px + env(safe-area-inset-left));
   padding-right: calc(32px + env(safe-area-inset-right));
   transition: box-shadow 150ms ease;
+}
+.app-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Tab strip — second row of the header, beneath brand/avatars. */
+.app-header-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+  margin-left: -8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.app-header-tabs::-webkit-scrollbar { display: none; }
+.app-header-tab {
+  position: relative;
+  padding: 10px 12px;
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+.app-header-tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-blue);
+}
+@media (hover: hover) {
+  .app-header-tab:hover { color: var(--text-primary); }
 }
 
 .app-header-brand-wrap {
@@ -310,9 +347,11 @@ html[data-theme="dark"] .app-header-current {
 
 @media (max-width: 639px) {
   .app-header {
-    padding: 2px 16px;
+    padding: 2px 16px 0;
     padding-top: calc(2px + env(safe-area-inset-top));
   }
+  .app-header-tabs { margin-top: 4px; gap: 0; }
+  .app-header-tab { padding: 10px 10px; font-size: 10px; letter-spacing: 0.14em; }
   .app-header .app-header-brand { font-size: 14px; letter-spacing: 0.18em; }
   .app-header .app-header-brand-os { display: none; }
   .app-header .app-header-current { display: none; }
@@ -717,6 +756,446 @@ html[data-theme="dark"] .task-title-input {
   .priority-slot-num { font-size: 0.8125rem; min-width: 22px; }
   .priority-title { font-size: 0.875rem; }
 }
+
+/* =========================================================================
+   Digital — client roster.
+   ========================================================================= */
+.digital-page {
+  padding: 16px 32px 64px;
+}
+@media (max-width: 639px) {
+  .digital-page { padding: 12px 16px 64px; }
+}
+
+.digital-page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.digital-page-section-title {
+  margin: 0;
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.digital-page-section-title-upcoming { margin-top: 32px; margin-bottom: 12px; }
+
+.digital-new-client-btn {
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: filter 150ms ease;
+}
+.digital-new-client-btn:hover { filter: brightness(1.15); }
+
+.digital-empty {
+  padding: 32px 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text-subtle);
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.digital-empty em {
+  color: var(--text-primary);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* New client form */
+.client-form {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--card-shadow);
+}
+.client-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.client-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.client-form-field > span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.client-form-field input,
+.client-form-field select,
+.client-form-field textarea {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: 'Syne', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 150ms ease;
+}
+.client-form-field input:focus,
+.client-form-field select:focus,
+.client-form-field textarea:focus {
+  border-color: var(--accent-blue);
+}
+.client-form-notes { margin-top: 12px; }
+.client-form-notes textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+.client-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.client-form-cancel,
+.client-form-submit {
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+.client-form-cancel { background: transparent; color: var(--text-secondary); }
+.client-form-submit {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+}
+
+/* Client card */
+.client-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.client-card {
+  background: var(--card-bg);
+  border: 1px solid var(--row-divider);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  transition: border-color 150ms ease;
+}
+.client-card.is-meta-open { border-color: var(--border-strong); }
+
+.client-card-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  user-select: none;
+}
+.client-card-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.client-card-name {
+  margin: 0;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+.client-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.client-card-analyst {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.client-card-status-pill {
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #F57F17;
+  background: rgba(245, 127, 23, 0.15);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.client-card-dates {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+.client-card-summary-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.client-card-progress { color: var(--text-primary); font-weight: 500; }
+.client-card-days { color: var(--text-subtle); }
+.client-card-task-count { color: var(--text-muted); }
+
+.client-card-meta-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 4px 10px;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.client-card-meta-toggle:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.client-card.is-meta-open .client-card-meta-toggle {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+@media (max-width: 639px) {
+  .client-card-summary { flex-direction: column; align-items: flex-start; }
+  .client-card-summary-stats { gap: 10px; flex-wrap: wrap; }
+}
+
+.client-card-meta-panel {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--row-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: color-mix(in srgb, var(--surface-hover) 30%, transparent);
+}
+
+.client-card-tasks {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--row-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.client-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.client-meta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.client-meta-field > span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.client-meta-field input,
+.client-meta-field select,
+.client-meta-field textarea {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: 'Syne', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+}
+.client-meta-field input:focus,
+.client-meta-field select:focus,
+.client-meta-field textarea:focus {
+  border-color: var(--accent-blue);
+}
+.client-meta-notes { grid-column: 1 / -1; }
+.client-meta-notes textarea {
+  resize: vertical;
+  min-height: 50px;
+  font-family: inherit;
+}
+
+.client-card-task-input input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: 'Syne', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.client-card-task-input input:focus {
+  border-color: #E8530E;
+  box-shadow: 0 0 0 2px rgba(232, 83, 14, 0.15);
+}
+
+.client-card-archive {
+  align-self: flex-start;
+  background: transparent;
+  color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+  border-radius: 3px;
+  padding: 5px 10px;
+  font-family: 'Syne', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.client-card-archive:hover { background: rgba(204, 51, 51, 0.1); }
+
+/* =========================================================================
+   Management — artist grid + cards.
+   ========================================================================= */
+.artist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px 32px 64px;
+}
+@media (max-width: 639px) {
+  .artist-grid {
+    padding: 12px 16px 64px;
+    gap: 12px;
+  }
+}
+
+.artist-card {
+  background: var(--card-bg);
+  border: 1px solid var(--row-divider);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.artist-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--row-divider);
+}
+.artist-card-title {
+  margin: 0;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+.artist-card-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.artist-card-input-wrap { display: flex; }
+.artist-card-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: 'Syne', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.artist-card-input:focus {
+  border-color: #E8530E;
+  box-shadow: 0 0 0 2px rgba(232, 83, 14, 0.15);
+}
+
+/* Reusable drag-reorder list — used by Management + Digital cards. */
+.dnd-list-empty {
+  padding: 12px 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.dnd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dnd-list-item {
+  cursor: grab;
+  position: relative;
+}
+.dnd-list-item:active { cursor: grabbing; }
+.dnd-list-item .task-row-swipe {
+  border-bottom: 1px solid var(--row-divider);
+}
+.dnd-list .dnd-list-item:last-child .task-row-swipe {
+  border-bottom: none;
+}
+.dnd-list-item.is-dragging { opacity: 0.4; }
+.dnd-list-item.is-drop-above::before,
+.dnd-list-item.is-drop-below::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-blue);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.dnd-list-item.is-drop-above::before { top: -1px; }
+.dnd-list-item.is-drop-below::after { bottom: -1px; }
 
 /* =========================================================================
    Task list card — distinct elevated surface around the list.

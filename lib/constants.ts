@@ -1,6 +1,40 @@
-import type { ContextTag, TeamMember } from "./types";
+import type {
+  Artist,
+  ContextTag,
+  DigitalAnalyst,
+  Scope,
+  TeamMember,
+} from "./types";
 
 export const TEAM: TeamMember[] = ["Jon", "Luis", "Aidan", "Liam"];
+
+// Roster — hardcoded. The 5 artists Triptych Management currently represents.
+// Ordering controls left-to-right card order on /management.
+export const ARTISTS: Artist[] = [
+  "Baltazar Lora",
+  "Wacomo",
+  "Cam Rao",
+  "Yami Club",
+  "JEV",
+];
+
+// Digital account analysts (the post-pipeline operators, not Triptych team).
+export const DIGITAL_ANALYSTS: DigitalAnalyst[] = [
+  "Halle",
+  "Jett",
+  "Zoe",
+  "Aurora",
+  "Annie",
+];
+
+export const SCOPES: Scope[] = ["internal", "management", "digital", "media"];
+
+export const SCOPE_LABEL: Record<Scope, string> = {
+  internal: "Internal",
+  management: "Management",
+  digital: "Digital",
+  media: "Media",
+};
 
 export const OWNER_COLORS: Record<TeamMember, string> = {
   Jon: "#E85533",
@@ -123,3 +157,6 @@ export function tagShortName(tag: ContextTag): string {
 
 export const USER_COOKIE = "triptych-user";
 export const USER_COOKIE_DAYS = 30;
+
+export const LAST_TAB_COOKIE = "triptych-last-tab";
+export const LAST_TAB_COOKIE_DAYS = 30;

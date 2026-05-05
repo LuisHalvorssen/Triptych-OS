@@ -105,7 +105,7 @@ export function TopPriorities({ slots, onUnpin, onReorder, lastUpdate }: Props) 
                       {task.title}
                     </span>
                     <span className="priority-meta">
-                      <PriorityTag tag={task.context} />
+                      {task.context && <PriorityTag tag={task.context} />}
                       <button
                         type="button"
                         className="priority-unpin tap-target"
@@ -136,7 +136,7 @@ function SlotNumberCell({ slot }: { slot: SlotNumber }) {
   );
 }
 
-function PriorityTag({ tag }: { tag: Task["context"] }) {
+function PriorityTag({ tag }: { tag: NonNullable<Task["context"]> }) {
   const { color, bg } = tagStyle(tag);
   return (
     <span

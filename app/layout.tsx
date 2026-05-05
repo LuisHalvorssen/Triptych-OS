@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Syne, IBM_Plex_Mono } from "next/font/google";
+import { AppShell } from "@/components/AppShell";
 import "./globals.css";
 
 const syne = Syne({
@@ -35,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${syne.variable} ${plexMono.variable}`}>
       <body className="bg-bg text-[color:var(--text-primary)] min-h-screen">
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

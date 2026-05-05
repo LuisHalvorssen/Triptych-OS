@@ -538,13 +538,15 @@ export function TaskRow({
             {formatCreatedAt(task.created_at)}
           </span>
 
-          <span className="task-tag">
-            <TagPillSelect
-              tag={task.context}
-              onChange={(next) => onUpdateContext(task.id, next)}
-              disabled={isDone}
-            />
-          </span>
+          {task.context && (
+            <span className="task-tag">
+              <TagPillSelect
+                tag={task.context}
+                onChange={(next) => onUpdateContext(task.id, next)}
+                disabled={isDone}
+              />
+            </span>
+          )}
         </div>
 
         <div className="task-actions">
