@@ -5,8 +5,8 @@ import { useApp } from "@/components/AppShell";
 import { TaskInput } from "@/components/TaskInput";
 import { TaskList } from "@/components/TaskList";
 import { TopPriorities, type PrioritySlot } from "@/components/TopPriorities";
+import { api } from "@/lib/api-client";
 import { DEFAULT_TAG } from "@/lib/constants";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { useScopedTasks } from "@/lib/useScopedTasks";
 import type {
@@ -37,6 +37,7 @@ export default function InternalPage() {
     handleTogglePin,
     handleReorderPriorities,
     handleDelete,
+    inflight,
   } = useScopedTasks(SCOPE);
 
   const handleCreate = useCallback(
@@ -49,29 +50,19 @@ export default function InternalPage() {
         });
         const cat = (await res.json()) as CategorizeResponse;
 
-        const { data, error } = await supabase
-          .from("tasks")
-          .insert({
+        const { task } = await inflight(() =>
+          api.post<{ task: Task }>("/api/tasks", {
             title,
             owner,
             context: cat.context_tag ?? DEFAULT_TAG,
             status: "Todo",
             scope: SCOPE,
           })
-          .select()
-          .single();
+        );
 
-        if (error) {
-          console.error("[tasks] insert error:", error);
-          toast.error("Couldn't save task");
-          return false;
-        }
-        if (data) {
-          const row = data as Task;
-          setTasks((prev) =>
-            prev.some((t) => t.id === row.id) ? prev : [row, ...prev]
-          );
-        }
+        setTasks((prev) =>
+          prev.some((t) => t.id === task.id) ? prev : [task, ...prev]
+        );
         return true;
       } catch (err) {
         console.error("[tasks] create failed:", err);
@@ -79,7 +70,7 @@ export default function InternalPage() {
         return false;
       }
     },
-    [setTasks]
+    [setTasks, inflight]
   );
 
   const handleUpdateContext = useCallback(

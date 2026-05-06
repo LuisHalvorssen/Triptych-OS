@@ -4,8 +4,8 @@ import { useCallback, useMemo } from "react";
 import { useApp } from "@/components/AppShell";
 import { ArtistCard } from "@/components/ArtistCard";
 import { TopPriorities, type PrioritySlot } from "@/components/TopPriorities";
+import { api } from "@/lib/api-client";
 import { ARTISTS } from "@/lib/constants";
-import { supabase } from "@/lib/supabase";
 import { toast } from "@/lib/toast";
 import { useScopedTasks } from "@/lib/useScopedTasks";
 import type { Artist, SlotNumber, Task } from "@/lib/types";
@@ -30,9 +30,9 @@ export default function ManagementPage() {
     handleTogglePin,
     handleReorderPriorities,
     handleDelete,
+    inflight,
   } = useScopedTasks(SCOPE);
 
-  // Group + sort tasks by artist (ascending position; smaller = top of card).
   const tasksByArtist = useMemo(() => {
     const map = new Map<Artist, Task[]>();
     ARTISTS.forEach((a) => map.set(a, []));
@@ -42,55 +42,47 @@ export default function ManagementPage() {
       }
     });
     map.forEach((list) => {
-      list.sort((a, b) => {
-        const pa = a.position ?? 0;
-        const pb = b.position ?? 0;
-        return pa - pb;
-      });
+      list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
     });
     return map;
   }, [visibleTasks]);
 
   const handleCreate = useCallback(
     async (artist: Artist, title: string) => {
-      // New tasks go to the top of the artist's card → smallest position.
       const existing = tasksByArtist.get(artist) ?? [];
       const minPos = existing.reduce<number | null>(
-        (acc, t) => (t.position == null ? acc : acc == null ? t.position : Math.min(acc, t.position)),
+        (acc, t) =>
+          t.position == null ? acc : acc == null ? t.position : Math.min(acc, t.position),
         null
       );
       const newPosition = minPos == null ? 0 : minPos - 1;
 
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert({
-          title,
-          owner: currentUser,
-          context: null,
-          status: "Todo",
-          scope: SCOPE,
-          artist,
-          position: newPosition,
-        })
-        .select()
-        .single();
-      if (error) {
-        console.error("[tasks] insert error:", error);
-        toast.error("Couldn't save task");
-        return;
-      }
-      if (data) {
-        const row = data as Task;
-        setTasks((prev) =>
-          prev.some((t) => t.id === row.id) ? prev : [row, ...prev]
+      try {
+        const { task } = await inflight(() =>
+          api.post<{ task: Task }>("/api/tasks", {
+            title,
+            owner: currentUser,
+            context: null,
+            status: "Todo",
+            scope: SCOPE,
+            artist,
+            position: newPosition,
+          })
         );
+        setTasks((prev) =>
+          prev.some((t) => t.id === task.id) ? prev : [task, ...prev]
+        );
+      } catch (err) {
+        console.error("[tasks] create failed:", err);
+        toast.error("Couldn't save task");
       }
     },
-    [currentUser, setTasks, tasksByArtist]
+    [currentUser, setTasks, tasksByArtist, inflight]
   );
 
   const handleReorder = useCallback(
-    (taskId: string, newPosition: number) => patchTask(taskId, { position: newPosition }),
+    (taskId: string, newPosition: number) =>
+      patchTask(taskId, { position: newPosition }),
     [patchTask]
   );
 

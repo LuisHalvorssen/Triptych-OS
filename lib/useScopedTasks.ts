@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/AppShell";
-import { supabase, syncDeleteTaskOnUnload } from "@/lib/supabase";
+import { api, syncDeleteTaskOnUnload } from "@/lib/api-client";
 import { dismiss as dismissToast, toast } from "@/lib/toast";
 import type {
   Scope,
@@ -12,10 +12,18 @@ import type {
   TopPriority,
 } from "@/lib/types";
 
+const POLL_INTERVAL_MS = 5000;
+
 // Shared task + priority state machine. Used by /internal, /management, /digital.
-// Each page wraps the returned `setTasks` to plug in its own create handler
-// (different scopes need different insert payloads — internal uses AI tags,
-// management sets `artist`, digital sets `client_id`).
+//
+// Replaces the previous Supabase-realtime model with API + polling. The
+// browser no longer holds the anon key; every CRUD round-trips through
+// /api/* routes (service_role server-side). Polling refreshes state every
+// POLL_INTERVAL_MS but is paused while local mutations are in flight so a
+// poll never clobbers an optimistic update.
+//
+// Each page wraps `setTasks` to plug in its own create handler — different
+// scopes need different insert payloads.
 export function useScopedTasks(scope: Scope) {
   const { currentUser } = useApp();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -32,106 +40,84 @@ export function useScopedTasks(scope: Scope) {
   >(new Map());
   const deleteToastIdRef = useRef<string | null>(null);
 
+  // Pause polling while user-driven mutations are in flight to prevent
+  // a fresh GET from overwriting in-progress optimistic updates.
+  const inflightRef = useRef(0);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [tasksRes, prioritiesRes] = await Promise.all([
+        api.get<{ tasks: Task[] }>(`/api/tasks?scope=${scope}`),
+        api.get<{ priorities: TopPriority[] }>(
+          `/api/priorities?scope=${scope}`
+        ),
+      ]);
+      // Merge: drop tasks that are pending soft-delete from the fetched
+      // list so they don't visibly reappear during the undo window.
+      setTasks(tasksRes.tasks);
+      setPriorities(prioritiesRes.priorities);
+    } catch (err) {
+      console.error("[scoped-tasks] refresh failed:", err);
+    }
+  }, [scope]);
+
+  // Initial load.
   useEffect(() => {
     let cancelled = false;
-
-    async function load() {
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("scope", scope)
-        .order("created_at", { ascending: false });
-      if (!cancelled && !error && data) setTasks(data as Task[]);
-      if (error) {
-        console.error("[tasks] load error:", error);
+    (async () => {
+      try {
+        const [tasksRes, prioritiesRes] = await Promise.all([
+          api.get<{ tasks: Task[] }>(`/api/tasks?scope=${scope}`),
+          api.get<{ priorities: TopPriority[] }>(
+            `/api/priorities?scope=${scope}`
+          ),
+        ]);
+        if (cancelled) return;
+        setTasks(tasksRes.tasks);
+        setPriorities(prioritiesRes.priorities);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[scoped-tasks] initial load failed:", err);
         toast.error("Couldn't load tasks");
       }
-
-      const { data: pdata, error: perror } = await supabase
-        .from("top_priorities")
-        .select("*")
-        .eq("scope", scope)
-        .order("slot");
-      if (!cancelled && !perror && pdata) setPriorities(pdata as TopPriority[]);
-      if (perror) console.warn("[priorities] load skipped:", perror.message);
-    }
-    load();
-
-    const channel = supabase
-      .channel(`tasks-${scope}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tasks",
-          filter: `scope=eq.${scope}`,
-        },
-        (payload) => {
-          setTasks((prev) => {
-            if (payload.eventType === "INSERT") {
-              const row = payload.new as Task;
-              if (prev.some((t) => t.id === row.id)) return prev;
-              return [row, ...prev];
-            }
-            if (payload.eventType === "UPDATE") {
-              const row = payload.new as Task;
-              // If a task moved out of this scope (artist reassign across
-              // scopes — unlikely today but cheap to handle), drop it.
-              if (row.scope !== scope) return prev.filter((t) => t.id !== row.id);
-              return prev.map((t) => (t.id === row.id ? row : t));
-            }
-            if (payload.eventType === "DELETE") {
-              const row = payload.old as Task;
-              return prev.filter((t) => t.id !== row.id);
-            }
-            return prev;
-          });
-        }
-      )
-      .subscribe();
-
-    const pchannel = supabase
-      .channel(`priorities-${scope}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "top_priorities",
-          filter: `scope=eq.${scope}`,
-        },
-        (payload) => {
-          setPriorities((prev) => {
-            if (payload.eventType === "INSERT") {
-              const row = payload.new as TopPriority;
-              return [...prev.filter((p) => p.slot !== row.slot), row].sort(
-                (a, b) => a.slot - b.slot
-              );
-            }
-            if (payload.eventType === "UPDATE") {
-              const row = payload.new as TopPriority;
-              return prev
-                .filter((p) => p.slot !== row.slot)
-                .concat(row)
-                .sort((a, b) => a.slot - b.slot);
-            }
-            if (payload.eventType === "DELETE") {
-              const row = payload.old as Partial<TopPriority>;
-              if (row.slot != null) return prev.filter((p) => p.slot !== row.slot);
-            }
-            return prev;
-          });
-        }
-      )
-      .subscribe();
-
+    })();
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
-      supabase.removeChannel(pchannel);
     };
   }, [scope]);
+
+  // Polling loop. Refresh every 5s when no mutation is in flight.
+  // Pauses when the document is hidden so we don't poll background tabs.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      if (document.visibilityState !== "visible") return;
+      if (inflightRef.current > 0) return;
+      await refresh();
+    };
+    const handle = setInterval(tick, POLL_INTERVAL_MS);
+    // Refresh immediately on tab return.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(handle);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh]);
+
+  // Wraps mutations so polling is paused during the round trip.
+  const inflight = useCallback(async <T>(fn: () => Promise<T>): Promise<T> => {
+    inflightRef.current++;
+    try {
+      return await fn();
+    } finally {
+      inflightRef.current--;
+    }
+  }, []);
 
   const patchTask = useCallback(
     async (id: string, patch: Partial<Task>) => {
@@ -140,9 +126,10 @@ export function useScopedTasks(scope: Scope) {
         previous = prev.find((t) => t.id === id);
         return prev.map((t) => (t.id === id ? { ...t, ...patch } : t));
       });
-      const { error } = await supabase.from("tasks").update(patch).eq("id", id);
-      if (error) {
-        console.error("[tasks] update error:", error);
+      try {
+        await inflight(() => api.patch(`/api/tasks/${id}`, patch));
+      } catch (err) {
+        console.error("[tasks] update error:", err);
         toast.error("Update failed");
         if (previous) {
           const snapshot = previous;
@@ -150,7 +137,7 @@ export function useScopedTasks(scope: Scope) {
         }
       }
     },
-    []
+    [inflight]
   );
 
   const handleToggleDone = useCallback(
@@ -176,13 +163,12 @@ export function useScopedTasks(scope: Scope) {
         if (!existing) return;
         const slot = existing.slot;
         setPriorities((prev) => prev.filter((p) => p.slot !== slot));
-        const { error } = await supabase
-          .from("top_priorities")
-          .delete()
-          .eq("scope", scope)
-          .eq("slot", slot);
-        if (error) {
-          console.error("[priorities] unpin error:", error);
+        try {
+          await inflight(() =>
+            api.del(`/api/priorities?scope=${scope}&slot=${slot}`)
+          );
+        } catch (err) {
+          console.error("[priorities] unpin error:", err);
           toast.error("Couldn't unpin");
           setPriorities((prev) =>
             prev.some((p) => p.slot === slot)
@@ -211,19 +197,22 @@ export function useScopedTasks(scope: Scope) {
           (a, b) => a.slot - b.slot
         )
       );
-      const { error } = await supabase.from("top_priorities").insert({
-        scope,
-        slot,
-        task_id: taskId,
-        pinned_by: currentUser,
-      });
-      if (error) {
-        console.error("[priorities] pin error:", error);
+      try {
+        await inflight(() =>
+          api.post("/api/priorities", {
+            scope,
+            slot,
+            task_id: taskId,
+            pinned_by: currentUser,
+          })
+        );
+      } catch (err) {
+        console.error("[priorities] pin error:", err);
         toast.error("Couldn't pin");
         setPriorities((prev) => prev.filter((p) => p.slot !== slot));
       }
     },
-    [priorities, currentUser, scope]
+    [priorities, currentUser, scope, inflight]
   );
 
   const handleReorderPriorities = useCallback(
@@ -239,39 +228,42 @@ export function useScopedTasks(scope: Scope) {
           })
           .sort((a, b) => a.slot - b.slot)
       );
-      const { error } = await supabase.rpc("swap_priority_slots", {
-        p_scope: scope,
-        slot_a: from,
-        slot_b: to,
-      });
-      if (error) {
-        console.error("[priorities] reorder error:", error);
+      try {
+        await inflight(() =>
+          api.post("/api/priorities/swap", { scope, from, to })
+        );
+      } catch (err) {
+        console.error("[priorities] reorder error:", err);
         toast.error("Couldn't reorder");
         setPriorities(snap);
       }
     },
-    [priorities, scope]
+    [priorities, scope, inflight]
   );
 
-  const commitPendingDelete = useCallback(async (id: string, task: Task) => {
-    const t = deleteCommitTimersRef.current.get(id);
-    if (t) clearTimeout(t);
-    deleteCommitTimersRef.current.delete(id);
-    setPendingDeletes((m) => {
-      const next = new Map(m);
-      next.delete(id);
-      return next;
-    });
-    setTasks((prev) => prev.filter((x) => x.id !== id));
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
-    if (error) {
-      console.error("[tasks] delete error:", error);
-      toast.error("Delete failed");
-      setTasks((prev) =>
-        prev.some((x) => x.id === id) ? prev : [task, ...prev]
-      );
-    }
-  }, []);
+  const commitPendingDelete = useCallback(
+    async (id: string, task: Task) => {
+      const t = deleteCommitTimersRef.current.get(id);
+      if (t) clearTimeout(t);
+      deleteCommitTimersRef.current.delete(id);
+      setPendingDeletes((m) => {
+        const next = new Map(m);
+        next.delete(id);
+        return next;
+      });
+      setTasks((prev) => prev.filter((x) => x.id !== id));
+      try {
+        await inflight(() => api.del(`/api/tasks/${id}`));
+      } catch (err) {
+        console.error("[tasks] delete error:", err);
+        toast.error("Delete failed");
+        setTasks((prev) =>
+          prev.some((x) => x.id === id) ? prev : [task, ...prev]
+        );
+      }
+    },
+    [inflight]
+  );
 
   const handleUndoDelete = useCallback((id: string) => {
     const t = deleteCommitTimersRef.current.get(id);
@@ -389,5 +381,7 @@ export function useScopedTasks(scope: Scope) {
     handleTogglePin,
     handleReorderPriorities,
     handleDelete,
+    inflight,
+    refresh,
   };
 }

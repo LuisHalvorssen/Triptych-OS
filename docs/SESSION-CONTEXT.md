@@ -2,7 +2,7 @@
 
 **Read this first when starting a new Claude session on this project.** It captures everything a fresh agent needs to be productive in 5 minutes instead of re-exploring.
 
-Last updated: 2026-05-05 (Multi-scope rebuild — Internal / Management / Digital / Media)
+Last updated: 2026-05-06 (API-proxy security model — anon key removed from browser, RLS enabled)
 
 ---
 
@@ -42,6 +42,7 @@ If the user asks to pick up where we left off, the rebuild from a single tagged-
 - **Styling:** CSS variables + inline styles + Tailwind `3.4.13` (tailwind is underused — most styling is via CSS vars in `globals.css` and inline style objects)
 - **DB + Realtime:** Supabase (`@supabase/supabase-js ^2.45.4`)
 - **AI:** Anthropic SDK `^0.32.1`, model `claude-haiku-4-5`, `max_tokens: 60`. **Used by `/internal` only.** Management and Digital scopes don't need categorization (the bucket IS the category).
+- **DB access pattern (since 2026-05-06):** browser → Next.js API routes (`/api/*`) → Supabase via service-role key. The browser no longer holds the anon key. RLS is enabled with no anon policies; service_role bypasses RLS by design. Realtime subscriptions are gone — replaced with 5-second polling when the tab is visible (paused while mutations are in flight).
 - **Linter:** ESLint `9.39.4` + `eslint-config-next 16.2.4` (flat config in [eslint.config.mjs](../eslint.config.mjs))
 - **Hosting:** Vercel (auto-deploy on push to `main`)
 - **Domain:** `tasks.triptychmgmt.com` → Vercel via A-record `76.76.21.21` at GoDaddy
@@ -58,7 +59,7 @@ If the user asks to pick up where we left off, the rebuild from a single tagged-
 | Vercel dashboard | https://vercel.com/luishalvorssens-projects/triptych-os |
 | Supabase project | `wpsprumpwklpwdgffgyr` at https://wpsprumpwklpwdgffgyr.supabase.co |
 | Supabase tables | `public.tasks`, `public.top_priorities`, `public.digital_clients` (all in `supabase_realtime` publication) |
-| **SQL migrations** | `docs/migrations/001-multi-scope.sql`, `002-context-nullable.sql`, `003-task-position.sql` — run in order in the Supabase SQL editor |
+| **SQL migrations** | `docs/migrations/001-multi-scope.sql`, `002-context-nullable.sql`, `003-task-position.sql`, `004-enable-rls.sql` — run in order in the Supabase SQL editor |
 | Anthropic console | https://console.anthropic.com |
 | GoDaddy DNS | `triptychmgmt.com` registered at GoDaddy; `tasks` A-record → `76.76.21.21` |
 | CI | `.github/workflows/ci.yml` — runs typecheck + lint + build on every push/PR |
@@ -71,10 +72,12 @@ All four are required in production. Server-only ones (no `NEXT_PUBLIC_` prefix)
 
 | Name | Surface | Purpose |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | browser + server | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | Supabase anon JWT (shipped to clients by design) |
+| `NEXT_PUBLIC_SUPABASE_URL` | server (and harmless on client) | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | **server only** | Bypasses RLS; used by all `/api/*` routes via `lib/supabase-server.ts` |
 | `ANTHROPIC_API_KEY` | server only (`/api/categorize`) | Claude API key — only `/internal` calls categorize |
 | `GATE_PASSWORD` | server only (middleware + `/api/gate`) | Shared team password; currently `93Leonard` |
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` was **removed** in the 2026-05-06 refactor and must NOT come back. The anon role has no RLS policies; if a client tried to use the anon key, every query would return zero rows.
 
 ⚠️ **Anthropic key was leaked in chat early in the project's life.** Rotate at https://console.anthropic.com/settings/keys when convenient. Still pending.
 
@@ -162,7 +165,7 @@ alter publication supabase_realtime add table public.digital_clients;
 
 **Position semantics:** `tasks.position` is sorted **ascending** (smaller = top of list). New tasks on `/management` and `/digital` get `(min existing in bucket) - 1` so they appear at top. Reorders insert between two positions by averaging them. Floating-point splits are fine for the current task volumes; if precision becomes an issue, write a renumber RPC.
 
-**RLS posture:** still effectively permissive. The anon key can read/insert/update/delete all rows. Safe today *only because* the entire site sits behind the `GATE_PASSWORD` middleware. If you remove the gate or expose the anon key publicly, migrate to proper RLS policies.
+**RLS posture (since 2026-05-06):** RLS is **enabled** on `tasks`, `top_priorities`, and `digital_clients`. The anon role has **no policies** — every query from anon returns zero rows. Direct grants to anon were also revoked. The app works because every API route uses `service_role` (bypasses RLS by design). The `GATE_PASSWORD` middleware is now defense-in-depth on top of a real boundary, not the only thing standing between attackers and the data.
 
 ---
 
@@ -176,6 +179,12 @@ app/
   gate/page.tsx               password prompt UI (client component)
   api/categorize/route.ts     server proxy to Anthropic — only /internal calls this
   api/gate/route.ts           password check → sets HttpOnly cookie (edge runtime)
+  api/tasks/route.ts          GET (list by scope) + POST (insert)
+  api/tasks/[id]/route.ts     PATCH + DELETE
+  api/priorities/route.ts     GET + POST + DELETE (slot pin/unpin)
+  api/priorities/swap/route.ts  POST — calls swap_priority_slots RPC
+  api/clients/route.ts        GET + POST (digital_clients)
+  api/clients/[id]/route.ts   PATCH (also used to soft-archive)
 
   internal/page.tsx           current SPA (TaskInput + TopPriorities + TaskList) — uses useScopedTasks('internal')
   management/page.tsx         5 artist cards (ArtistCard) — uses useScopedTasks('management')
@@ -216,27 +225,36 @@ components/
   Toaster                     fixed bottom-center toast stack (error/success/info/action variants)
 
 lib/
-  useScopedTasks.ts           Shared task + priority state machine. Loads tasks + priorities filtered
-                              by scope, subscribes to per-scope realtime channels (tasks-${scope},
-                              priorities-${scope}). Returns mutations (toggle, update, pin, reorder
-                              priorities, soft-delete with 4s undo). Each page wraps `setTasks`
-                              with its own create handler — different scopes have different insert
-                              payloads.
+  api-client.ts               Tiny fetch wrapper used by all client-side code. {api.get, api.post,
+                              api.patch, api.del} return parsed JSON or throw ApiError.
+                              syncDeleteTaskOnUnload(id) — keepalive DELETE for the soft-delete
+                              beforeunload path.
+  api-helpers.ts              Server-side helpers (jsonError, parseScope, parseSlot) used by routes.
+  supabase-server.ts          server-only (`import "server-only"`) Supabase client using
+                              service_role key. NEVER import from a "use client" file.
+  database.ts                 Minimal Database type for the supabase-js generic.
+  useScopedTasks.ts           Shared task + priority state machine. Loads via /api, polls every
+                              5s when tab visible, returns mutations (toggle, update, pin, reorder,
+                              soft-delete + 4s undo). Polling is paused while mutations are in
+                              flight (inflight ref counter) so optimistic updates aren't clobbered.
+                              Each page wraps `setTasks` with its own create handler.
+  useDigitalClients.ts        Same pattern for digital_clients (load + 5s polling + CRUD).
   constants.ts                TEAM, ARTISTS, DIGITAL_ANALYSTS, SCOPES, SCOPE_LABEL, OWNER_COLORS,
                               TAGS (legacy — internal only), DEFAULT_TAG, USER_COOKIE,
                               LAST_TAB_COOKIE.
   types.ts                    Task, DigitalClient, TopPriority, Scope, Artist, DigitalAnalyst,
                               DigitalClientStatus, TeamMember, etc.
   cookies.ts                  triptych-user, triptych-last-tab read/write + isValidScope guard
-  supabase.ts, theme.ts, toast.ts, gate.ts, useSwipe.ts  — unchanged from v1
+  theme.ts, toast.ts, gate.ts, useSwipe.ts  — unchanged
 ```
 
 ### Data flow (any scope)
 
-1. Page mounts `useScopedTasks(scope)`. The hook fetches `tasks` and `top_priorities` filtered by `scope=eq.${scope}`, subscribes to two realtime channels with the same filter.
-2. User input flows through page-level handlers (`handleCreate*` and the mutations returned from the hook). All Supabase writes go through these handlers — components never call Supabase directly.
-3. Optimistic updates with rollback on failure. Realtime events from other clients merge into local state (dedup by id for tasks, by slot for priorities).
+1. Page mounts `useScopedTasks(scope)`. The hook hits `GET /api/tasks?scope=X` and `GET /api/priorities?scope=X` once on mount, then again every 5 seconds (when the tab is visible AND no mutation is in flight).
+2. User input flows through page-level handlers (`handleCreate*` and the mutations returned from the hook). Mutations call `/api/*` POST/PATCH/DELETE; **components never import `supabase-server` directly** (that's server-only).
+3. Optimistic updates with rollback on failure. The next poll reconciles local state with server state — but polling is paused during in-flight mutations so a poll never clobbers optimistic state.
 4. Task ordering: `/internal` sorts by `created_at desc`; `/management` and `/digital` sort by `position asc`.
+5. Latency to see another team member's change: 0–5s (next poll picks it up). For 4 users this is invisible. If it ever feels slow, promote to SSE — server keeps one Supabase realtime sub, fans out events via `text/event-stream` to all connected browsers.
 
 ---
 
@@ -262,7 +280,7 @@ Violating any of these is a regression.
 5. **The `ARTISTS` list is hardcoded** in `lib/constants.ts` (5 names). Order in that array drives left-to-right card order on `/management`. Adding/removing an artist requires editing the constant + (optionally) cleaning up orphaned tasks via SQL.
 6. **`DIGITAL_ANALYSTS` is also hardcoded** — adding a new analyst means editing the constant.
 7. **Env vars with `NEXT_PUBLIC_` prefix ship to the browser.** Anything secret must not use that prefix.
-8. **The password gate is the only thing protecting Supabase data.** Don't bypass, remove, or commit `GATE_PASSWORD`.
+8. **DB access is server-only.** The browser hits `/api/*` routes. The service-role key never ships to the browser. Never `import "@/lib/supabase-server"` from a `"use client"` file — the `import "server-only"` guard will fail the build. The gate is now defense-in-depth on top of RLS, not the only protection.
 9. **The Sacred Flow (`/internal`):** log on → pick owner → type → enter → see it appear. Don't add required fields or modals before submit.
 10. **Task position is ascending** (smaller = top). New tasks on `/management` and `/digital` get `min - 1`. Reorders average neighbors. Don't accidentally flip the sort direction.
 11. **Before pushing:** run `npm run lint && npx tsc --noEmit && npm run build`. CI will catch regressions, but ship verified.
@@ -285,9 +303,9 @@ The legacy 13-prompt UX work stream (mobile responsive, hover/touch, typography,
 ## 10. Known outstanding work (non-UX)
 
 - **Rotate the Anthropic API key** (still pending). https://console.anthropic.com/settings/keys → revoke + generate → update `.env.local` + `vercel env rm/add ANTHROPIC_API_KEY production` → redeploy.
-- **RLS migration.** Same posture as v1; required if you ever remove the gate or expose the anon key publicly.
-- **V3: Digital current_posts API sync.** `digital_clients.current_posts` is a normal editable column today. When the upstream API integration is built, an external sync job should `UPDATE` that column on a schedule; realtime will push the changes to all open browsers automatically. The manual edit input in `ClientCard` stays as a fallback override.
-- **Digital tasks still tagged with `context='Digital'`.** The 18 tasks that were `Digital`-tagged in v1 landed in `scope='internal'` with the original tag intact. They need to be manually re-bucketed to specific clients once the user creates real `digital_clients` rows from the audit (Mt.Joy, Lila Drew, Shav, Claire Brooks, Borderline, etc.).
+- **V3: Digital current_posts API sync.** `digital_clients.current_posts` is a normal editable column today. When the upstream API integration is built, an external sync job should `UPDATE` that column on a schedule; the next poll picks it up. The manual edit input in `ClientCard` stays as a fallback override.
+- **Digital tasks still tagged with `context='Digital'` on /internal.** The 18 tasks that were `Digital`-tagged in v1 landed in `scope='internal'` with the original tag intact. Manually re-bucket to specific clients via the UI when convenient.
+- **Promote polling → SSE if 5s latency becomes annoying.** Server keeps one Supabase realtime sub per scope, fans out via SSE.
 - **`top_priorities.task_id` is no longer globally unique** — relaxed to unique-per-scope. In practice each task has one scope, so this won't matter.
 
 ---
@@ -305,6 +323,7 @@ The legacy 13-prompt UX work stream (mobile responsive, hover/touch, typography,
 - **DnD drop index is held in a ref, not just state**, so synchronous event sequences (programmatic drops in tests, very fast user drops) read the latest value. State is still updated for the visible drop indicator.
 - **Inline metadata edits commit on `blur`.** If you set a value programmatically without firing focus/blur, the patch won't run. Real users hit blur naturally when tabbing or clicking out.
 - **`current_posts` and `total_posts_target` are integers.** Empty string in the input → `null` (target) or `0` (current).
+- **`@supabase/supabase-js` is pinned to `2.45.4`** in package.json. Newer versions (2.100+) require an `__InternalSupabase: { PostgrestVersion }` field in the Database generic type, which is fragile. Pin stays unless someone wants to write a stricter type. `npm install` of unrelated deps may try to bump it — re-pin if it does.
 - **Mt. Joy test client** may still be in your DB from rebuild verification. SQL to wipe: `delete from public.digital_clients where name = 'Mt. Joy';` (cascades to tasks).
 - **The `Header` has 2 rows:** a `.app-header-row` for brand + avatars + theme toggle, and a `.app-header-tabs` strip below. Mobile shrinks both.
 - **Position-collision race on rapid create.** `handleCreateTask` in `/digital` and `/management` reads `visibleTasks` from closure to compute `min - 1`. Two creates fired inside a single React batch (effectively impossible by hand) would both compute the same position. Sort order between equal-position tasks is undefined. If this ever bites, switch to a ref-read or use a server-side `default position = (select min - 1 ...)`.

@@ -8,12 +8,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ConfigMissing } from "@/components/ConfigMissing";
 import { Header } from "@/components/Header";
 import { Toaster } from "@/components/Toaster";
 import { UserSelector } from "@/components/UserSelector";
 import { isValidScope, readUserCookie, writeLastTabCookie, writeUserCookie } from "@/lib/cookies";
-import { isSupabaseConfigured, missingSupabaseEnvVars } from "@/lib/supabase";
 import {
   applyTheme,
   readThemeCookie,
@@ -74,10 +72,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   if (!hydrated) return null;
-
-  if (!isSupabaseConfigured) {
-    return <ConfigMissing missing={missingSupabaseEnvVars} />;
-  }
 
   if (!currentUser) {
     return (

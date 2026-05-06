@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useApp } from "@/components/AppShell";
 import { ClientCard } from "@/components/ClientCard";
 import { NewClientForm, type NewClientPayload } from "@/components/NewClientForm";
 import { TopPriorities, type PrioritySlot } from "@/components/TopPriorities";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api-client";
 import { toast } from "@/lib/toast";
+import { useDigitalClients } from "@/lib/useDigitalClients";
 import { useScopedTasks } from "@/lib/useScopedTasks";
-import type { DigitalClient, SlotNumber, Task } from "@/lib/types";
+import type { SlotNumber, Task } from "@/lib/types";
 
 const SCOPE = "digital" as const;
 
@@ -30,149 +31,52 @@ export default function DigitalPage() {
     handleTogglePin,
     handleReorderPriorities,
     handleDelete,
+    inflight,
   } = useScopedTasks(SCOPE);
 
-  const [clients, setClients] = useState<DigitalClient[]>([]);
+  const { clients, createClient, updateClient, archiveClient } =
+    useDigitalClients();
   const [showNewForm, setShowNewForm] = useState(false);
-
-  // Load + realtime for clients.
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const { data, error } = await supabase
-        .from("digital_clients")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (!cancelled && !error && data) setClients(data as DigitalClient[]);
-      if (error) {
-        console.error("[clients] load error:", error);
-        toast.error("Couldn't load clients");
-      }
-    }
-    load();
-
-    const channel = supabase
-      .channel("digital-clients")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "digital_clients" },
-        (payload) => {
-          setClients((prev) => {
-            if (payload.eventType === "INSERT") {
-              const row = payload.new as DigitalClient;
-              if (prev.some((c) => c.id === row.id)) return prev;
-              return [row, ...prev];
-            }
-            if (payload.eventType === "UPDATE") {
-              const row = payload.new as DigitalClient;
-              return prev.map((c) => (c.id === row.id ? row : c));
-            }
-            if (payload.eventType === "DELETE") {
-              const row = payload.old as DigitalClient;
-              return prev.filter((c) => c.id !== row.id);
-            }
-            return prev;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   const handleCreateClient = useCallback(
     async (payload: NewClientPayload) => {
-      const { data, error } = await supabase
-        .from("digital_clients")
-        .insert(payload)
-        .select()
-        .single();
-      if (error) {
-        console.error("[clients] insert error:", error);
-        toast.error("Couldn't create client");
-        return;
-      }
-      if (data) {
-        const row = data as DigitalClient;
-        setClients((prev) =>
-          prev.some((c) => c.id === row.id) ? prev : [row, ...prev]
-        );
-      }
-      setShowNewForm(false);
+      const created = await createClient(payload);
+      if (created) setShowNewForm(false);
     },
-    []
-  );
-
-  const handleUpdateClient = useCallback(
-    async (id: string, patch: Partial<DigitalClient>) => {
-      let previous: DigitalClient | undefined;
-      setClients((prev) => {
-        previous = prev.find((c) => c.id === id);
-        return prev.map((c) => (c.id === id ? { ...c, ...patch } : c));
-      });
-      const { error } = await supabase
-        .from("digital_clients")
-        .update(patch)
-        .eq("id", id);
-      if (error) {
-        console.error("[clients] update error:", error);
-        toast.error("Update failed");
-        if (previous) {
-          const snap = previous;
-          setClients((prev) => prev.map((c) => (c.id === id ? snap : c)));
-        }
-      }
-    },
-    []
-  );
-
-  const handleArchiveClient = useCallback(
-    (id: string) =>
-      handleUpdateClient(id, {
-        status: "archived",
-        archived_at: new Date().toISOString(),
-      }),
-    [handleUpdateClient]
+    [createClient]
   );
 
   const handleCreateTask = useCallback(
     async (clientId: string, title: string) => {
       const existing = visibleTasks.filter((t) => t.client_id === clientId);
       const minPos = existing.reduce<number | null>(
-        (acc, t) => (t.position == null ? acc : acc == null ? t.position : Math.min(acc, t.position)),
+        (acc, t) =>
+          t.position == null ? acc : acc == null ? t.position : Math.min(acc, t.position),
         null
       );
       const newPosition = minPos == null ? 0 : minPos - 1;
 
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert({
-          title,
-          owner: currentUser,
-          context: null,
-          status: "Todo",
-          scope: SCOPE,
-          client_id: clientId,
-          position: newPosition,
-        })
-        .select()
-        .single();
-      if (error) {
-        console.error("[tasks] insert error:", error);
-        toast.error("Couldn't save task");
-        return;
-      }
-      if (data) {
-        const row = data as Task;
-        setTasks((prev) =>
-          prev.some((t) => t.id === row.id) ? prev : [row, ...prev]
+      try {
+        const { task } = await inflight(() =>
+          api.post<{ task: Task }>("/api/tasks", {
+            title,
+            owner: currentUser,
+            context: null,
+            status: "Todo",
+            scope: SCOPE,
+            client_id: clientId,
+            position: newPosition,
+          })
         );
+        setTasks((prev) =>
+          prev.some((t) => t.id === task.id) ? prev : [task, ...prev]
+        );
+      } catch (err) {
+        console.error("[tasks] create failed:", err);
+        toast.error("Couldn't save task");
       }
     },
-    [currentUser, visibleTasks, setTasks]
+    [currentUser, visibleTasks, setTasks, inflight]
   );
 
   const handleReorderTask = useCallback(
@@ -260,8 +164,8 @@ export default function DigitalPage() {
               pinnedTaskIds={pinnedTaskIds}
               prioritiesFull={prioritiesFull}
               recentlyDeletingIds={recentlyDeletingIds}
-              onUpdateClient={handleUpdateClient}
-              onArchiveClient={handleArchiveClient}
+              onUpdateClient={updateClient}
+              onArchiveClient={archiveClient}
               onCreateTask={handleCreateTask}
               onReorderTask={handleReorderTask}
               onToggleDone={handleToggleDone}
@@ -287,8 +191,8 @@ export default function DigitalPage() {
                   pinnedTaskIds={pinnedTaskIds}
                   prioritiesFull={prioritiesFull}
                   recentlyDeletingIds={recentlyDeletingIds}
-                  onUpdateClient={handleUpdateClient}
-                  onArchiveClient={handleArchiveClient}
+                  onUpdateClient={updateClient}
+                  onArchiveClient={archiveClient}
                   onCreateTask={handleCreateTask}
                   onReorderTask={handleReorderTask}
                   onToggleDone={handleToggleDone}
