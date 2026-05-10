@@ -22,7 +22,8 @@ export type Artist =
   | "Cam Rao"
   | "Baltazar Lora"
   | "JEV"
-  | "Yami Club";
+  | "Yami Club"
+  | "Joshua Bassett";
 
 export type DigitalAnalyst = "Halle" | "Jett" | "Zoe" | "Aurora" | "Annie";
 

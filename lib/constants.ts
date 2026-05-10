@@ -16,6 +16,7 @@ export const ARTISTS: Artist[] = [
   "Cam Rao",
   "Yami Club",
   "JEV",
+  "Joshua Bassett",
 ];
 
 // Digital account analysts (the post-pipeline operators, not Triptych team).
