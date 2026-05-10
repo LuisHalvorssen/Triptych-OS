@@ -85,9 +85,11 @@ export default function DigitalPage() {
     [patchTask]
   );
 
+  // Done tasks are hidden — same UX as Management. Still in DB.
   const tasksByClient = useMemo(() => {
     const map = new Map<string, Task[]>();
     visibleTasks.forEach((t) => {
+      if (t.status === "Done") return;
       if (!t.client_id) return;
       if (!map.has(t.client_id)) map.set(t.client_id, []);
       map.get(t.client_id)!.push(t);

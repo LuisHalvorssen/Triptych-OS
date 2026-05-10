@@ -1202,6 +1202,20 @@ html[data-theme="dark"] .task-title-input {
 .dnd-list-item.is-drop-above::before { top: -1px; }
 .dnd-list-item.is-drop-below::after { bottom: -1px; }
 
+.dnd-list-toggle {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  padding: 6px 4px 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--accent-blue);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.dnd-list-toggle:hover { color: var(--text-primary); text-decoration: underline; }
+
 /* =========================================================================
    Task list card — distinct elevated surface around the list.
    Mobile: edge-to-edge (negate container 16px gutter), no radius, lighter shadow.

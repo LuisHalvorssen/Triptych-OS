@@ -10,6 +10,10 @@ interface Props {
   prioritiesFull: boolean;
   recentlyDeletingIds: Set<string>;
   emptyMessage?: string;
+  // When set, render only the first N tasks by default with a "+rest more"
+  // toggle. The full task array is still passed in so DnD reorder
+  // positions stay correct regardless of what's visible.
+  maxVisible?: number;
   onReorder: (taskId: string, newPosition: number) => void | Promise<void>;
   onToggleDone: (id: string, nextDone: boolean) => Promise<void>;
   onUpdateTitle: (id: string, title: string) => Promise<void>;
@@ -30,6 +34,7 @@ export function TaskListDnD({
   prioritiesFull,
   recentlyDeletingIds,
   emptyMessage = "No tasks yet",
+  maxVisible,
   onReorder,
   onToggleDone,
   onUpdateTitle,
@@ -44,6 +49,13 @@ export function TaskListDnD({
     setDropIndexState(v);
   };
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  const truncated = maxVisible != null && !expanded && tasks.length > maxVisible;
+  const visibleTasks = truncated ? tasks.slice(0, maxVisible) : tasks;
+  const hiddenCount = tasks.length - visibleTasks.length;
+  const canCollapse =
+    expanded && maxVisible != null && tasks.length > maxVisible;
 
   function handleRowDragOver(e: React.DragEvent<HTMLLIElement>, index: number) {
     if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
@@ -81,14 +93,15 @@ export function TaskListDnD({
   }
 
   return (
+    <>
     <ul
       className="dnd-list"
       onDragLeave={handleListDragLeave}
       onDrop={handleDrop}
     >
-      {tasks.map((t, i) => {
+      {visibleTasks.map((t, i) => {
         const showLineAbove = dropIndex === i;
-        const showLineBelow = i === tasks.length - 1 && dropIndex === tasks.length;
+        const showLineBelow = i === visibleTasks.length - 1 && dropIndex === visibleTasks.length;
         const dimmed = draggingId === t.id;
         return (
           <li
@@ -131,6 +144,16 @@ export function TaskListDnD({
         );
       })}
     </ul>
+    {(truncated || canCollapse) && (
+      <button
+        type="button"
+        className="dnd-list-toggle"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {truncated ? `+${hiddenCount} more` : "Show less"}
+      </button>
+    )}
+    </>
   );
 }
 

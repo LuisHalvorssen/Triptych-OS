@@ -69,6 +69,7 @@ export function ArtistCard({
         pinnedTaskIds={pinnedTaskIds}
         prioritiesFull={prioritiesFull}
         recentlyDeletingIds={recentlyDeletingIds}
+        maxVisible={3}
         onReorder={onReorder}
         onToggleDone={onToggleDone}
         onUpdateTitle={onUpdateTitle}

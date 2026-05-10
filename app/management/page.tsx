@@ -33,10 +33,13 @@ export default function ManagementPage() {
     inflight,
   } = useScopedTasks(SCOPE);
 
+  // Done tasks are hidden from the cards (they pile up otherwise). Still in
+  // the DB; future "Show completed" toggle could reveal them.
   const tasksByArtist = useMemo(() => {
     const map = new Map<Artist, Task[]>();
     ARTISTS.forEach((a) => map.set(a, []));
     visibleTasks.forEach((t) => {
+      if (t.status === "Done") return;
       if (t.artist && map.has(t.artist as Artist)) {
         map.get(t.artist as Artist)!.push(t);
       }

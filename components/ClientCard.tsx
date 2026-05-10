@@ -146,6 +146,7 @@ export function ClientCard({
           pinnedTaskIds={pinnedTaskIds}
           prioritiesFull={prioritiesFull}
           recentlyDeletingIds={recentlyDeletingIds}
+          maxVisible={3}
           onReorder={onReorderTask}
           onToggleDone={onToggleDone}
           onUpdateTitle={onUpdateTitle}
