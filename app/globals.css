@@ -1093,8 +1093,35 @@ html[data-theme="dark"] .task-title-input {
 .client-card-archive:hover { background: rgba(204, 51, 51, 0.1); }
 
 /* =========================================================================
-   Management — artist grid + cards.
+   Management — header strip (Top 3 + General) and artist grid.
    ========================================================================= */
+.management-header-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  padding: 8px 32px 0;
+  align-items: start;
+}
+/* TopPriorities wraps itself in .container-responsive (max-width 900);
+   inside the strip we let it fill its grid column instead. */
+.management-header-strip > .container-responsive {
+  max-width: none;
+  padding: 0;
+}
+.management-header-strip > .artist-card {
+  margin-top: 8px; /* mirror TopPriorities' container paddingTop */
+}
+@media (max-width: 900px) {
+  .management-header-strip {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .management-header-strip > .artist-card { margin-top: 0; }
+}
+@media (max-width: 639px) {
+  .management-header-strip { padding: 4px 16px 0; gap: 10px; }
+}
+
 .artist-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

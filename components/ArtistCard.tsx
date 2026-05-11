@@ -2,14 +2,18 @@
 
 import { useState, type FormEvent } from "react";
 import { TaskListDnD } from "@/components/TaskListDnD";
-import type { Artist, Task, TeamMember } from "@/lib/types";
+import type { Task, TeamMember } from "@/lib/types";
 
 interface Props {
-  artist: Artist;
+  // Displayed in the card header and used to build the input placeholder
+  // unless `placeholder` is provided. Used for both artist cards
+  // ("Wacomo", "Cam Rao", …) and the General management bucket.
+  title: string;
   tasks: Task[]; // pre-filtered, pre-sorted by position
   pinnedTaskIds: Set<string>;
   prioritiesFull: boolean;
   recentlyDeletingIds: Set<string>;
+  placeholder?: string;
   onCreate: (title: string) => void | Promise<void>;
   onReorder: (taskId: string, newPosition: number) => void | Promise<void>;
   onToggleDone: (id: string, nextDone: boolean) => Promise<void>;
@@ -20,11 +24,12 @@ interface Props {
 }
 
 export function ArtistCard({
-  artist,
+  title,
   tasks,
   pinnedTaskIds,
   prioritiesFull,
   recentlyDeletingIds,
+  placeholder,
   onCreate,
   onReorder,
   onToggleDone,
@@ -35,19 +40,20 @@ export function ArtistCard({
 }: Props) {
   const [input, setInput] = useState("");
   const activeCount = tasks.filter((t) => t.status === "Todo").length;
+  const effectivePlaceholder = placeholder ?? `Add task for ${title}…`;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const title = input.trim();
-    if (!title) return;
-    onCreate(title);
+    const value = input.trim();
+    if (!value) return;
+    onCreate(value);
     setInput("");
   }
 
   return (
     <section className="artist-card">
       <header className="artist-card-header">
-        <h3 className="artist-card-title">{artist}</h3>
+        <h3 className="artist-card-title">{title}</h3>
         <span className="artist-card-count">
           {activeCount} {activeCount === 1 ? "task" : "tasks"}
         </span>
@@ -57,10 +63,10 @@ export function ArtistCard({
         <input
           type="text"
           className="artist-card-input"
-          placeholder={`Add task for ${artist}…`}
+          placeholder={effectivePlaceholder}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          aria-label={`Add task for ${artist}`}
+          aria-label={effectivePlaceholder}
         />
       </form>
 
